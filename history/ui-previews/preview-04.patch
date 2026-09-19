@@ -1,0 +1,219 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.230074883 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.231135052 +0000
+@@ -93,6 +93,7 @@
+         except tk.TclError:
+             pass
+         self.protocol('WM_DELETE_WINDOW', self.close)
++        self.after(80, self._apply_window_chrome)
+         self.after(150, self.check_recovery)
+ 
+     def _set_initial_geometry(self):
+@@ -109,6 +110,42 @@
+         self.geometry(f'{width}x{height}+{x}+{y}')
+         self.minsize(980, 610)
+ 
++
++    @staticmethod
++    def _colorref(hex_color):
++        hex_color = hex_color.lstrip('#')
++        if len(hex_color) != 6:
++            return 0
++        r = int(hex_color[0:2], 16)
++        g = int(hex_color[2:4], 16)
++        b = int(hex_color[4:6], 16)
++        return (b << 16) | (g << 8) | r
++
++    def _apply_window_chrome(self):
++        """Use a dark Windows title bar when the platform supports it."""
++        if not sys.platform.startswith('win'):
++            return
++        try:
++            import ctypes
++            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
++            if not hwnd:
++                hwnd = self.winfo_id()
++            dark = ctypes.c_int(1)
++            attrs = [20, 19]  # Win11 / Win10 immersive dark mode ids.
++            for attr in attrs:
++                try:
++                    ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(dark), ctypes.sizeof(dark))
++                except OSError:
++                    pass
++            for attr, color in [(35, self._colorref('#110C14')), (34, self._colorref('#110C14')), (36, self._colorref('#FFF1F7'))]:
++                try:
++                    value = ctypes.c_int(color)
++                    ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(value), ctypes.sizeof(value))
++                except OSError:
++                    pass
++        except Exception:
++            pass
++
+     def _pick_font(self, *preferred):
+         """Return the first installed font family, with a safe Tk fallback."""
+         try:
+@@ -202,6 +239,14 @@
+             'mono': self._pick_font('Cascadia Mono', 'JetBrains Mono', 'Consolas', 'DejaVu Sans Mono'),
+         }
+         self.option_add('*Font', (self.FONTS['body'], 9))
++        self.option_add('*TCombobox*Listbox.background', c['panel3'])
++        self.option_add('*TCombobox*Listbox.foreground', c['text'])
++        self.option_add('*TCombobox*Listbox.selectBackground', '#4A1F39')
++        self.option_add('*TCombobox*Listbox.selectForeground', '#FFFFFF')
++        self.option_add('*Menu.background', c['panel2'])
++        self.option_add('*Menu.foreground', c['text'])
++        self.option_add('*Menu.activeBackground', '#4A1F39')
++        self.option_add('*Menu.activeForeground', '#FFFFFF')
+ 
+         style = ttk.Style(self)
+         if 'clam' in style.theme_names():
+@@ -236,35 +281,42 @@
+         style.configure('Cyan.TLabel', background=c['panel2'], foreground=c['cyan'],
+                         font=(self.FONTS['mono'], 8, 'bold'))
+ 
+-        style.configure('TEntry', padding=7, relief='flat', borderwidth=1,
+-                        foreground=c['text'], fieldbackground=c['panel3'])
++        style.configure('TEntry', padding=8, relief='flat', borderwidth=1,
++                        foreground=c['text'], fieldbackground=c['panel3'],
++                        insertcolor=c['pink'])
+         style.map('TEntry', fieldbackground=[('disabled', '#17131A')],
+                   foreground=[('disabled', '#706670')])
+-        style.configure('TCombobox', padding=6, arrowsize=14,
+-                        foreground=c['text'], fieldbackground=c['panel3'])
++        style.configure('TCombobox', padding=8, arrowsize=13, relief='flat', borderwidth=1,
++                        foreground=c['text'], fieldbackground=c['panel3'], arrowcolor=c['pink'],
++                        bordercolor='#5A3146', lightcolor='#5A3146', darkcolor='#5A3146')
+         style.map('TCombobox', fieldbackground=[('readonly', c['panel3'])],
+                   selectbackground=[('readonly', c['panel3'])],
+                   selectforeground=[('readonly', c['text'])])
+-        style.configure('TSpinbox', padding=6, arrowsize=12,
+-                        foreground=c['text'], fieldbackground=c['panel3'])
++        style.configure('TSpinbox', padding=8, arrowsize=11, relief='flat', borderwidth=1,
++                        foreground=c['text'], fieldbackground=c['panel3'],
++                        arrowcolor=c['pink'])
+         style.configure('TCheckbutton', background=c['panel'], foreground=c['text'], padding=2)
+         style.map('TCheckbutton', background=[('active', c['panel'])],
+                   foreground=[('active', c['text'])],
+                   indicatorcolor=[('selected', c['pink']), ('!selected', '#5D505A')])
+ 
+         style.configure('TButton', padding=(12, 8), relief='flat', borderwidth=1,
+-                        background=c['panel3'], foreground=c['text'])
++                        background=c['panel3'], foreground=c['text'], bordercolor='#523545',
++                        lightcolor='#523545', darkcolor='#523545')
+         style.map('TButton', background=[('active', '#332536'), ('pressed', '#241A28'), ('disabled', '#17141A')],
+                   foreground=[('disabled', '#655C65')])
+         style.configure('Primary.TButton', padding=(16, 9), background=c['pink2'],
+                         foreground='#FFFFFF', bordercolor=c['pink'])
+         style.map('Primary.TButton', background=[('active', c['pink']), ('pressed', '#B61F5C'), ('disabled', '#442537')],
+                   foreground=[('disabled', '#957A88')])
+-        style.configure('Danger.TButton', background='#3A1820', foreground='#FF8B99', bordercolor='#702535')
++        style.configure('Danger.TButton', background='#3A1820', foreground='#FF8B99', bordercolor='#702535',
++                        lightcolor='#702535', darkcolor='#702535')
+         style.map('Danger.TButton', background=[('active', '#52202B')])
+-        style.configure('Ghost.TButton', background=c['panel2'], foreground=c['muted'], bordercolor=c['border'])
++        style.configure('Ghost.TButton', background=c['panel2'], foreground=c['muted'], bordercolor='#483340',
++                        lightcolor='#483340', darkcolor='#483340')
+         style.map('Ghost.TButton', background=[('active', c['panel3'])], foreground=[('active', c['text'])])
+-        style.configure('Cyan.TButton', background='#143638', foreground='#74FFF3', bordercolor='#246B6A')
++        style.configure('Cyan.TButton', background='#143638', foreground='#74FFF3', bordercolor='#246B6A',
++                        lightcolor='#246B6A', darkcolor='#246B6A')
+         style.map('Cyan.TButton', background=[('active', '#1B4A4A')])
+ 
+         style.configure('Treeview', rowheight=28, relief='flat', borderwidth=0,
+@@ -315,10 +367,21 @@
+         ttk.Label(side_text, text=f'AnimeRenamer {VERSION}', style='SidebarMuted.TLabel',
+                   font=(self.FONTS['mono'], 8)).pack(side='bottom', anchor='w')
+ 
++        # Compact themed chrome strip under the system title bar.
++        chrome = ttk.Frame(main, style='Panel.TFrame', padding=(12, 8))
++        chrome.pack(fill='x', pady=(0, 10))
++        chrome.columnconfigure(1, weight=1)
++        ttk.Label(chrome, text='ANIME RENAMER', style='Cyan.TLabel').grid(row=0, column=0, sticky='w')
++        ttk.Label(chrome, text='未来日记 · Theme Surface', style='Accent.TLabel').grid(row=0, column=1, sticky='w', padx=(10, 0))
++        self.chrome_state_var = tk.StringVar(value='PREVIEW SAFE')
++        tk.Label(chrome, textvariable=self.chrome_state_var, bg='#17121B', fg='#74FFF3', bd=1,
++                 relief='solid', padx=10, pady=4, highlightthickness=1, highlightbackground='#275A60',
++                 font=(self.FONTS['mono'], 8, 'bold')).grid(row=0, column=2, sticky='e')
++
+         # Image-backed top banner. Text is rendered by Tk to keep Chinese/Japanese crisp.
+         self.banner_photo = self._load_photo('yuno_banner.png')
+         self.banner_canvas = tk.Canvas(main, height=112, bg='#140C13', bd=0,
+-                                       highlightthickness=0, relief='flat')
++                                       highlightthickness=1, highlightbackground='#3A2835', relief='flat')
+         self.banner_canvas.pack(fill='x', pady=(0, 11))
+         self.banner_canvas.bind('<Configure>', self._draw_banner)
+         self.after_idle(self._draw_banner)
+@@ -381,11 +444,11 @@
+         form_card.columnconfigure(5, weight=2)
+ 
+         # Action strip
+-        toolbar = ttk.Frame(main, style='App.TFrame')
++        toolbar = ttk.Frame(main, style='Panel.TFrame', padding=(10, 8))
+         toolbar.pack(fill='x', pady=(10, 8))
+-        ttk.Button(toolbar, text='设置所选分组', command=self.edit_group).pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='纠正集数 / 特别篇', command=self.edit_item).pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='跳过 / 恢复', command=self.toggle_skip).pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='设置所选分组', command=self.edit_group, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='纠正集数 / 特别篇', command=self.edit_item, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='跳过 / 恢复', command=self.toggle_skip, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+         ttk.Button(toolbar, text='清除纠正', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+         ttk.Label(toolbar, text='双击文件纠正 · 空格切换跳过', style='Muted.TLabel').pack(side='right')
+ 
+@@ -449,6 +512,10 @@
+                          self.lang_var, self.force_var, self.start_var]:
+             variable.trace_add('write', self.settings_changed)
+ 
++    def _set_chrome_state(self, text, mode='info'):
++        if hasattr(self, 'chrome_state_var'):
++            self.chrome_state_var.set(text)
++
+     def settings_changed(self, *_):
+         if self.folder_var.get() != self.source_context:
+             self.groups.clear()
+@@ -458,6 +525,7 @@
+         self.dirty = True
+         self.run_btn.state(['disabled'])
+         self.status_var.set('设置已改变，请刷新预览后执行。')
++        self._set_chrome_state('NEEDS REFRESH')
+ 
+     def choose_folder(self):
+         folder = filedialog.askdirectory(parent=self, title='选择输入文件夹')
+@@ -563,11 +631,23 @@
+         ready = sum(x.status == READY for x in plan)
+         review = sum(x.status.startswith('待') for x in plan)
+         self.status_var.set(f'{len(nodes)} 组 · {len(plan)} 个文件 · 可执行 {ready} · 待确认/填写 {review} · 已跳过 {sum(x.status == "已跳过" for x in plan)}')
++        if any(x.status.startswith(('冲突', '错误')) for x in plan):
++            self._set_chrome_state('CONFLICT DETECTED')
++        elif review:
++            self._set_chrome_state('CHECK BEFORE RUN')
++        elif ready:
++            self._set_chrome_state('PREVIEW SAFE')
++        else:
++            self._set_chrome_state('NO READY ITEMS')
+ 
+     def update_run_state(self):
+         allowed = not self.busy and not self.dirty and any(x.status == READY for x in self.plan)
+         allowed = allowed and not any(x.status.startswith(('冲突', '错误')) for x in self.plan)
+         self.run_btn.state(['!disabled'] if allowed else ['disabled'])
++        if self.busy:
++            self._set_chrome_state('PROCESSING...')
++        elif allowed:
++            self._set_chrome_state('PREVIEW SAFE')
+ 
+     def selected_indices(self):
+         indices = set()
+@@ -658,6 +738,7 @@
+     def operation_done(self, result):
+         self.dirty = True
+         self.status_var.set(result['message'])
++        self._set_chrome_state('DONE' if result['ok'] else 'FAILED')
+         show = messagebox.showinfo if result['ok'] else messagebox.showerror
+         show('完成' if result['ok'] else '未完成', result['message'], parent=self)
+         if result['ok']:
+@@ -677,6 +758,7 @@
+         try:
+             if pending_operation():
+                 self.status_var.set('发现未完成的操作，请先点击“恢复中断操作”。')
++                self._set_chrome_state('RECOVERY REQUIRED')
+         except OSError as exc:
+             self.status_var.set(f'恢复记录目录不可用：{exc}')
+ 
