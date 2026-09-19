@@ -199,8 +199,8 @@ python tools/package_release.py
 - `assets/yuno_banner_bright.png` / `assets/yuno_banner_bright_wide.png`：安全预览和完成状态亮态横幅；
 - `assets/yuno_banner.png` / `assets/yuno_banner_wide.png`：兼容横幅素材；
 - `assets/empty_phone.png`：空预览状态手机图；
-- `assets/app_icon.png`：运行时窗口图标；
-- `assets/app_icon.ico`：Windows EXE / 资源管理器图标。
+- `assets/app_icon.png`：新版“未来手机 + 日记本 + 红月”运行时窗口图标；
+- `assets/app_icon.ico`：同构图的 Windows 多尺寸 EXE / 资源管理器图标。
 
 界面状态与横幅联动：
 
