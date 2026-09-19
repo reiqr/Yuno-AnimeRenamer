@@ -1,0 +1,59 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.232342585 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.232654405 +0000
+@@ -307,10 +307,11 @@
+             return
+         canvas.delete('overlay')
+         width = max(canvas.winfo_width(), 720)
+-        if getattr(self, 'banner_photo', None):
+-            canvas.create_image(0, 0, image=self.banner_photo, anchor='nw', tags='overlay')
++        banner = getattr(self, 'banner_photo_wide', None) if width >= 840 else getattr(self, 'banner_photo', None)
++        if banner:
++            canvas.create_image(0, 0, image=banner, anchor='nw', tags='overlay')
+         # Dark veil on the right keeps text readable without altering the asset.
+-        height = max(88, canvas.winfo_height())
++        height = max(82, canvas.winfo_height())
+@@ -658,13 +659,13 @@
+-        # Sidebar uses an optimized local PNG generated for this theme.
++        # Sidebar art is pre-scaled to the exact compact slot (236x328) to avoid blur or clipping.
+@@
+-            fallback = tk.Canvas(sidebar, width=236, height=330, bg='#110C14', highlightthickness=0)
++            fallback = tk.Canvas(sidebar, width=236, height=328, bg='#110C14', highlightthickness=0)
+@@ -703,8 +704,9 @@
+-        # Image-backed top banner. Text is rendered by Tk to keep Chinese/Japanese crisp.
++        # Banner art is pre-scaled to 760x82 for the compact window; text stays native Tk for crispness.
+         self.banner_photo = self._load_photo('yuno_banner.png')
++        self.banner_photo_wide = self._load_photo('yuno_banner_wide.png')
+@@ -864,19 +866,25 @@
+-        # Empty state is a compact in-canvas diary card rather than a large opaque cover.
++        # Empty state uses a deliberately small phone illustration: enough theme, no visual takeover.
+         self.empty_state = tk.Frame(preview, bg='#121017', bd=0, highlightthickness=0)
+-        self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=326, height=112)
+-        empty_canvas = tk.Canvas(self.empty_state, width=64, height=88, bg='#121017',
+-                                 highlightthickness=0, bd=0)
+-        empty_canvas.pack(side='left', padx=(10, 12), pady=(10, 8))
+-        empty_canvas.create_rectangle(13, 4, 53, 82, outline='#4D3A47', width=1)
+-        empty_canvas.create_rectangle(17, 12, 49, 58, outline='#24575A', fill='#0F0D12', width=1)
+-        empty_canvas.create_text(33, 34, text='♥', fill=c['pink'], font=(self.FONTS['body'], 17, 'bold'))
+-        empty_canvas.create_line(22, 66, 44, 66, fill='#38D6D0', width=1)
+-        empty_canvas.create_oval(30, 72, 36, 78, outline='#715C69', width=1)
++        self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=318, height=104)
++        self.empty_phone_photo = self._load_photo('empty_phone.png')
++        if self.empty_phone_photo:
++            empty_visual = tk.Label(self.empty_state, image=self.empty_phone_photo, bg='#121017',
++                                    bd=0, highlightthickness=0)
++            empty_visual.pack(side='left', padx=(12, 13), pady=(12, 10))
++        else:
++            empty_canvas = tk.Canvas(self.empty_state, width=52, height=78, bg='#121017',
++                                     highlightthickness=0, bd=0)
++            empty_canvas.pack(side='left', padx=(12, 13), pady=(12, 10))
++            empty_canvas.create_rectangle(8, 2, 44, 74, outline='#4D3A47', width=1)
++            empty_canvas.create_rectangle(12, 10, 40, 52, outline='#24575A', fill='#0F0D12', width=1)
++            empty_canvas.create_text(26, 31, text='♥', fill=c['pink'], font=(self.FONTS['body'], 15, 'bold'))
++            empty_canvas.create_line(17, 59, 35, 59, fill='#38D6D0', width=1)
++            empty_canvas.create_oval(23, 65, 29, 71, outline='#715C69', width=1)
+         empty_text = tk.Frame(self.empty_state, bg='#121017')
+-        empty_text.pack(side='left', fill='both', expand=True, pady=(14, 8), padx=(0, 8))
++        empty_text.pack(side='left', fill='both', expand=True, pady=(13, 8), padx=(0, 8))
+@@ -1003,7 +1011,7 @@
+-            self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=326, height=112)
++            self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=318, height=104)
