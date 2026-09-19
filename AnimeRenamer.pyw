@@ -36,12 +36,13 @@ from ui_actions import ActionMixin
 from ui_constants import TEMPLATES
 from ui_dialogs import DialogMixin, GroupDialog
 from ui_layout import LayoutMixin
+from ui_light_novel import LightNovelMixin
 from ui_styles import StyleMixin
 from ui_theme import ThemeMixin, ThemeToggle
 from ui_view import ViewMixin
 
 
-class App(ThemeMixin, DialogMixin, StyleMixin, LayoutMixin, ViewMixin, ActionMixin, tk.Tk):
+class App(LightNovelMixin, ThemeMixin, DialogMixin, StyleMixin, LayoutMixin, ViewMixin, ActionMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f'AnimeRenamer {VERSION} · 未来日记主题')
