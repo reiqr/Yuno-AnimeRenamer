@@ -1,15 +1,14 @@
 @echo off
+setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
-where pythonw >nul 2>nul
-if %errorlevel%==0 (
-  start "" pythonw AnimeRenamer.pyw
-  exit /b
+
+rem Legacy Chinese compatibility entry. Keep all launch logic in run_app.bat.
+if not exist "run_app.bat" (
+  echo 未找到 run_app.bat，无法启动 AnimeRenamer。
+  pause
+  exit /b 1
 )
-where pyw >nul 2>nul
-if %errorlevel%==0 (
-  start "" pyw -3 AnimeRenamer.pyw
-  exit /b
-)
-echo 未检测到 Python，请安装 Python 3.10 或更高版本，或使用打包后的 AnimeRenamer.exe。
-pause
+
+call "run_app.bat"
+exit /b %errorlevel%
