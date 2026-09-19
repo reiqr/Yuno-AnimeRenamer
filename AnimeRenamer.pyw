@@ -4,6 +4,32 @@ from __future__ import annotations
 import queue
 import sys
 import threading
+
+
+def _enable_windows_dpi_awareness():
+    """Prevent Windows from bitmap-scaling Tk, which makes the whole UI blurry."""
+    if not sys.platform.startswith('win'):
+        return
+    try:
+        import ctypes
+        # Per-monitor-v2 on modern Windows. Must run before the first Tk window is created.
+        try:
+            ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+            return
+        except Exception:
+            pass
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            return
+        except Exception:
+            pass
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
+
+_enable_windows_dpi_awareness()
+
 import tkinter as tk
 import tkinter.font as tkfont
 from pathlib import Path
@@ -172,14 +198,16 @@ class App(tk.Tk):
         self.update_idletasks()
         sw = max(1024, self.winfo_screenwidth())
         sh = max(720, self.winfo_screenheight())
-        width = min(1240, max(1020, int(sw * 0.72)))
-        height = min(760, max(690, int(sh * 0.82)))
-        width = min(width, max(980, sw - 70))
-        height = min(height, max(620, sh - 60))
+        # DPI awareness keeps this a genuinely smaller window instead of a low-resolution
+        # window bitmap that Windows later stretches.
+        width = min(1160, max(1000, int(sw * 0.66)))
+        height = min(720, max(680, int(sh * 0.72)))
+        width = min(width, max(960, sw - 70))
+        height = min(height, max(640, sh - 60))
         x = max(0, (sw - width) // 2)
         y = max(0, (sh - height) // 2 - 12)
         self.geometry(f'{width}x{height}+{x}+{y}')
-        self.minsize(980, 610)
+        self.minsize(960, 640)
 
 
     @staticmethod
@@ -504,11 +532,12 @@ class App(tk.Tk):
         self._theme_images = []
         self.UI_ICONS = {}
         self.FONTS = {
+            # Use only Windows/system fonts: no external font files are required.
             'body': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'PingFang SC', 'Segoe UI'),
-            'display': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'Segoe UI'),
-            'latin': self._pick_font('Segoe UI Variable Display', 'Segoe UI Semibold', 'Segoe UI', 'Arial'),
+            'display': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Microsoft JhengHei UI', 'Segoe UI'),
+            'latin': self._pick_font('Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI Semibold', 'Segoe UI', 'Arial'),
             'jp': self._pick_font('Yu Gothic UI', 'Yu Gothic', 'Meiryo UI', 'Noto Sans CJK JP', 'Noto Sans JP', 'Microsoft YaHei UI'),
-            'mono': self._pick_font('Cascadia Mono', 'JetBrains Mono', 'Consolas', 'DejaVu Sans Mono'),
+            'mono': self._pick_font('Cascadia Mono', 'Cascadia Code', 'Consolas', 'JetBrains Mono', 'DejaVu Sans Mono'),
         }
         self.option_add('*Font', (self.FONTS['body'], 9))
         self.UI_ICONS = {
@@ -667,18 +696,18 @@ class App(tk.Tk):
         main = ttk.Frame(shell, style='App.TFrame', padding=(13, 9, 13, 9))
         main.pack(side='left', fill='both', expand=True)
 
-        # Give the artwork a little breathing room above it.  The image stays at its
-        # native 236x328 size; we move the whole visual block down instead of stretching it.
-        art_slot = tk.Frame(sidebar, bg='#110C14', width=236, height=340, bd=0, highlightthickness=0)
+        # Sidebar artwork is pre-rendered at its exact display size from a high-resolution
+        # source, with a safe top margin so the character's hair/head is never cropped.
+        art_slot = tk.Frame(sidebar, bg='#110C14', width=236, height=336, bd=0, highlightthickness=0)
         art_slot.pack(fill='x')
         art_slot.pack_propagate(False)
         self.sidebar_photo = self._load_photo('yuno_sidebar.png')
         if self.sidebar_photo:
             tk.Label(art_slot, image=self.sidebar_photo, bg='#110C14', bd=0,
-                     highlightthickness=0).pack(fill='x', pady=(12, 0))
+                     highlightthickness=0).pack(fill='x', pady=(6, 0))
         else:
             fallback = tk.Canvas(art_slot, width=236, height=328, bg='#110C14', highlightthickness=0)
-            fallback.pack(fill='x', pady=(12, 0))
+            fallback.pack(fill='x', pady=(6, 0))
             fallback.create_oval(32, 34, 204, 206, fill='#321326', outline='#74244D', width=2)
             fallback.create_text(118, 164, text='MIRAI NIKKI', fill='#FF6EA3',
                                  font=(self.FONTS['display'], 16, 'bold'))
