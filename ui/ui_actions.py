@@ -1,4 +1,5 @@
 import queue
+import sys
 import threading
 from pathlib import Path
 import tkinter as tk
@@ -24,6 +25,97 @@ def _format_speed(value):
 
 
 class ActionMixin:
+    def _mark_scan_started(self):
+        if getattr(self, 'busy', False) and hasattr(self, 'scan_btn'):
+            self.scan_btn.configure(text='刷新预览')
+
+    def _enable_folder_drop(self):
+        """Accept one folder dropped from Windows Explorer without extra packages."""
+        if not sys.platform.startswith('win') or getattr(self, '_drop_wndproc', None):
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            user32 = ctypes.windll.user32
+            shell32 = ctypes.windll.shell32
+            hwnd = self.winfo_id()
+            if not hwnd:
+                return
+
+            shell32.DragAcceptFiles(wintypes.HWND(hwnd), True)
+            shell32.DragQueryFileW.argtypes = [wintypes.HANDLE, wintypes.UINT, wintypes.LPWSTR, wintypes.UINT]
+            shell32.DragQueryFileW.restype = wintypes.UINT
+            shell32.DragFinish.argtypes = [wintypes.HANDLE]
+
+            wndproc_type = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, wintypes.HWND, wintypes.UINT,
+                                              wintypes.WPARAM, wintypes.LPARAM)
+            setter = getattr(user32, 'SetWindowLongPtrW', user32.SetWindowLongW)
+            setter.restype = ctypes.c_void_p
+            setter.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
+            user32.CallWindowProcW.restype = ctypes.c_ssize_t
+            user32.CallWindowProcW.argtypes = [ctypes.c_void_p, wintypes.HWND, wintypes.UINT,
+                                               wintypes.WPARAM, wintypes.LPARAM]
+            wm_dropfiles, gwl_wndproc = 0x0233, -4
+            old_proc = None
+
+            def wndproc(window, message, wparam, lparam):
+                if message == wm_dropfiles:
+                    hdrop = wintypes.HANDLE(wparam)
+                    try:
+                        count = shell32.DragQueryFileW(hdrop, 0xFFFFFFFF, None, 0)
+                        paths = []
+                        for index in range(count):
+                            length = shell32.DragQueryFileW(hdrop, index, None, 0)
+                            buffer = ctypes.create_unicode_buffer(length + 1)
+                            shell32.DragQueryFileW(hdrop, index, buffer, length + 1)
+                            paths.append(buffer.value)
+                    finally:
+                        shell32.DragFinish(hdrop)
+                    self.after_idle(lambda dropped=tuple(paths): self._handle_folder_drop(dropped))
+                    return 0
+                return user32.CallWindowProcW(old_proc, window, message, wparam, lparam)
+
+            callback = wndproc_type(wndproc)
+            old_proc = setter(wintypes.HWND(hwnd), gwl_wndproc,
+                              ctypes.cast(callback, ctypes.c_void_p))
+            if not old_proc:
+                shell32.DragAcceptFiles(wintypes.HWND(hwnd), False)
+                return
+            self._drop_hwnd = hwnd
+            self._drop_old_wndproc = old_proc
+            self._drop_wndproc = callback
+            self._drop_setter = setter
+            self._drop_shell32 = shell32
+        except Exception:
+            # Drag/drop is an optional Windows convenience; never block app startup.
+            self._drop_wndproc = None
+
+    def _disable_folder_drop(self):
+        if not getattr(self, '_drop_wndproc', None):
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+            self._drop_shell32.DragAcceptFiles(wintypes.HWND(self._drop_hwnd), False)
+            self._drop_setter(wintypes.HWND(self._drop_hwnd), -4,
+                              ctypes.c_void_p(self._drop_old_wndproc))
+        except Exception:
+            pass
+        self._drop_wndproc = None
+
+    def _handle_folder_drop(self, paths):
+        if self.busy:
+            self.status_var.set('正在处理，请完成当前操作后再拖入文件夹。')
+            return
+        paths = [Path(path) for path in paths]
+        if len(paths) != 1 or not paths[0].is_dir():
+            self._alert('拖入文件夹', '请一次拖入一个文件夹；单个文件和多个路径不会自动处理。', kind='warning')
+            return
+        self.folder_var.set(str(paths[0]))
+        self.status_var.set(f'已拖入：{paths[0]}')
+        self.scan()
+
     def settings_changed(self, *_):
         self._update_conditional_rows()
         if self.folder_var.get() != self.source_context:
@@ -159,11 +251,60 @@ class ActionMixin:
         self.status_var.set('正在识别文件…')
         self._set_empty_state('正在读取未来…', '正在分析文件名、字幕关联和分组，请稍候。', visible=True)
         self._start_task(lambda _: build_plan(**args), self.render_plan)
+        self._mark_scan_started()
 
-    def render_plan(self, plan):
-        self.plan, self.dirty, self.group_nodes = plan, False, {}
+    def _preview_filter_changed(self, *_):
+        if hasattr(self, 'tree') and not getattr(self, 'busy', False):
+            self._populate_preview_tree()
+
+    def _preview_visible_indices(self):
+        query = self.preview_query_var.get().strip().casefold() if hasattr(self, 'preview_query_var') else ''
+        mode = self.preview_filter_var.get() if hasattr(self, 'preview_filter_var') else '全部'
+        problems_only = bool(self.preview_problem_var.get()) if hasattr(self, 'preview_problem_var') else False
+        visible = []
+        for index, item in enumerate(self.plan):
+            status = item.status or ''
+            if problems_only and not status.startswith(('待', '冲突', '错误')):
+                continue
+            if mode == '可执行' and status != READY:
+                continue
+            if mode == '待确认' and not status.startswith('待'):
+                continue
+            if mode == '冲突/错误' and not status.startswith(('冲突', '错误')):
+                continue
+            if mode == '已跳过' and not status.startswith('已跳过'):
+                continue
+            if query:
+                haystack = ' '.join((
+                    str(item.group), str(item.kind), Path(item.old_path).name,
+                    str(item.detected), Path(item.new_path).name, status, str(item.reason),
+                )).casefold()
+                if query not in haystack:
+                    continue
+            visible.append(index)
+        return visible
+
+    def select_visible_rows(self):
+        if not hasattr(self, 'tree'):
+            return
+        rows = []
+        for group_iid in self.tree.get_children(''):
+            rows.extend(node for node in self.tree.get_children(group_iid) if node.startswith('r'))
+        if rows:
+            self.tree.selection_set(rows)
+            self.tree.focus(rows[0])
+            self.tree.see(rows[0])
+            self.show_detail()
+
+    def _populate_preview_tree(self):
+        if not hasattr(self, 'tree'):
+            return
+        self.tree.delete(*self.tree.get_children())
+        self.group_nodes = {}
         nodes = {}
-        for index, item in enumerate(plan):
+        visible = self._preview_visible_indices()
+        for shown_index, index in enumerate(visible):
+            item = self.plan[index]
             if item.group_id not in nodes:
                 node = f'g{len(nodes)}'
                 nodes[item.group_id] = node
@@ -182,24 +323,32 @@ class ActionMixin:
                 base_tag, shown_status = 'ready', 'OK  可执行'
             else:
                 base_tag, shown_status = 'neutral', status
-            stripe = 'even' if index % 2 == 0 else 'odd'
-            tag = f'{base_tag}_{stripe}'
+            stripe = 'even' if shown_index % 2 == 0 else 'odd'
             media = 'VIDEO' if item.kind == '视频' else ('SUB' if item.kind == '字幕' else str(item.kind).upper())
             self.tree.insert(nodes[item.group_id], 'end', iid=f'r{index}', values=(
                 media, Path(item.old_path).name, item.detected,
-                Path(item.new_path).name if item.new_path != item.old_path else '—', shown_status), tags=(tag,))
+                Path(item.new_path).name if item.new_path != item.old_path else '—', shown_status),
+                tags=(f'{base_tag}_{stripe}',))
+        if hasattr(self, 'preview_visible_var'):
+            self.preview_visible_var.set(f'SHOW {len(visible)} / {len(self.plan)}')
+        self._sync_group_markers()
+        self._sync_selection_markers()
+        if visible:
+            self._set_empty_state(visible=False)
+        elif self.plan:
+            self._set_empty_state('当前筛选没有结果', '调整搜索词、状态筛选或关闭“只看问题”。', visible=True)
+        else:
+            self._set_empty_state('没有发现可处理文件', '可以检查文件夹、子目录选项，或确认文件扩展名是否受支持。', visible=True)
+
+    def render_plan(self, plan):
+        self.plan, self.dirty, self.group_nodes = plan, False, {}
+        self._populate_preview_tree()
         ready, review, conflicts, skipped_count = self._plan_counts(plan)
         self.status_var.set(
-            f'{len(nodes)} 组 · {len(plan)} 个文件 · 可执行 {ready} · 待确认/填写 {review} · '
+            f'{len({x.group_id for x in plan})} 组 · {len(plan)} 个文件 · 可执行 {ready} · 待确认/填写 {review} · '
             f'冲突/错误 {conflicts} · 已跳过 {skipped_count}')
         if hasattr(self, 'preview_legend_var'):
             self.preview_legend_var.set(f'READY {ready}  ·  REVIEW {review}  ·  CONFLICT {conflicts}')
-        self._sync_group_markers()
-        self._sync_selection_markers()
-        if plan:
-            self._set_empty_state(visible=False)
-        else:
-            self._set_empty_state('没有发现可处理文件', '可以检查文件夹、子目录选项，或确认文件扩展名是否受支持。', visible=True)
         if any(x.status.startswith(('冲突', '错误')) for x in plan):
             self._set_chrome_state('CONFLICT DETECTED', 'error')
         elif review:
@@ -403,6 +552,7 @@ class ActionMixin:
             self.destroy()
 
     def destroy(self):
+        self._disable_folder_drop()
         self._stop_busy_animation()
         for callback in self.tk.splitlist(self.tk.call('after', 'info')):
             self.after_cancel(callback)

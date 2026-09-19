@@ -74,12 +74,19 @@ for /l %%R in (1,1,3) do (
 )
 if exist "dist\%EXE_BASE%.exe" goto :locked_exe
 
+rem Bundle only assets referenced at runtime; build/test/history material stays outside the EXE.
 %PY% -m PyInstaller --noconfirm --clean --onefile --windowed --noupx ^
   --name "%EXE_BASE%" ^
   --paths "%CD%\ui" ^
   --version-file "%CD%\build\windows_version_info.txt" ^
   --icon "%CD%\assets\app_icon.ico" ^
-  --add-data "%CD%\assets;assets" ^
+  --add-data "%CD%\assets\app_icon.png;assets" ^
+  --add-data "%CD%\assets\empty_phone.png;assets" ^
+  --add-data "%CD%\assets\yuno_sidebar.png;assets" ^
+  --add-data "%CD%\assets\yuno_banner_dark.png;assets" ^
+  --add-data "%CD%\assets\yuno_banner_dark_wide.png;assets" ^
+  --add-data "%CD%\assets\yuno_banner_bright.png;assets" ^
+  --add-data "%CD%\assets\yuno_banner_bright_wide.png;assets" ^
   --distpath "%CD%\dist" ^
   AnimeRenamer.pyw
 

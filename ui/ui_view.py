@@ -32,17 +32,38 @@ class ViewMixin:
             self.tree.item(iid, text=f'{marker}  {label}')
 
     def _resize_tree_columns(self, _event=None):
-        """Distribute preview columns by the actual viewport width."""
+        """Fill the preview viewport exactly while respecting useful minimums."""
         if not hasattr(self, 'tree'):
             return
-        width = max(620, self.tree.winfo_width() - 12)
-        specs = {
-            '#0': (0.12, 80), 'kind': (0.06, 46), 'old': (0.29, 155),
-            'detected': (0.10, 72), 'new': (0.29, 155), 'status': (0.14, 95),
-        }
-        for col, (ratio, minimum) in specs.items():
+        specs = [
+            ('#0', 0.12, 80), ('kind', 0.06, 46), ('old', 0.29, 155),
+            ('detected', 0.10, 72), ('new', 0.29, 155), ('status', 0.14, 95),
+        ]
+        minimum_total = sum(minimum for _col, _ratio, minimum in specs)
+        width = max(minimum_total, self.tree.winfo_width() - 2)
+        widths = {col: max(minimum, int(width * ratio))
+                  for col, ratio, minimum in specs}
+
+        # Min-width clamping can make the sum wider than the viewport on compact
+        # windows.  Trim the high-flex columns first; otherwise give rounding slack
+        # to TARGET so there is no unexplained gutter beside STATE/scrollbar.
+        delta = width - sum(widths.values())
+        if delta < 0:
+            overflow = -delta
+            minimums = {col: minimum for col, _ratio, minimum in specs}
+            for col in ('old', 'new', 'status', '#0', 'detected', 'kind'):
+                reducible = max(0, widths[col] - minimums[col])
+                take = min(reducible, overflow)
+                widths[col] -= take
+                overflow -= take
+                if overflow == 0:
+                    break
+        elif delta > 0:
+            widths['new'] += delta
+
+        for col, _ratio, minimum in specs:
             try:
-                self.tree.column(col, width=max(minimum, int(width * ratio)), minwidth=minimum)
+                self.tree.column(col, width=widths[col], minwidth=minimum)
             except tk.TclError:
                 pass
 
@@ -80,7 +101,9 @@ class ViewMixin:
             except (ValueError, IndexError):
                 pass
         elif iid in self.group_nodes:
-            self.detail_var.set('分组行 · 单击可选择整组，使用 GROUP 按钮设置该组的作品名、季度或起始集。')
+            novel = hasattr(self, 'content_type_var') and self.content_type_var.get() == '轻小说'
+            hint = '作品名或起始卷' if novel else '作品名、季度或起始集'
+            self.detail_var.set(f'分组行 · 单击可选择整组，使用 GROUP 按钮设置该组的{hint}。')
 
     def _clear_tree_hover(self):
         iid = getattr(self, '_hover_iid', None)
@@ -94,7 +117,9 @@ class ViewMixin:
         if self.tree.selection():
             self.show_detail()
         else:
-            self.detail_var.set('待确认的文件不会执行；悬停查看依据，双击可纠正集数。')
+            novel = hasattr(self, 'content_type_var') and self.content_type_var.get() == '轻小说'
+            self.detail_var.set('待确认的文件不会执行；悬停查看依据，双击可纠正卷数。' if novel
+                                else '待确认的文件不会执行；悬停查看依据，双击可纠正集数。')
 
     def _set_empty_state(self, title=None, subtitle=None, visible=True):
         if not hasattr(self, 'empty_state'):
@@ -106,7 +131,7 @@ class ViewMixin:
         if visible:
             width = getattr(self, 'empty_state_width', 390)
             height = getattr(self, 'empty_state_height', 116)
-            self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=width, height=height)
+            self.empty_state.place(relx=0.5, rely=0.50, anchor='center', width=width, height=height)
             self.empty_state.lift()
         else:
             self.empty_state.place_forget()

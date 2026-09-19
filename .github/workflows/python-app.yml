@@ -95,7 +95,13 @@ jobs:
             --paths "$PWD\ui" `
             --version-file "$PWD\build\windows_version_info.txt" `
             --icon "$PWD\assets\app_icon.ico" `
-            --add-data "$PWD\assets;assets" `
+            --add-data "$PWD\assets\app_icon.png;assets" `
+            --add-data "$PWD\assets\empty_phone.png;assets" `
+            --add-data "$PWD\assets\yuno_sidebar.png;assets" `
+            --add-data "$PWD\assets\yuno_banner_dark.png;assets" `
+            --add-data "$PWD\assets\yuno_banner_dark_wide.png;assets" `
+            --add-data "$PWD\assets\yuno_banner_bright.png;assets" `
+            --add-data "$PWD\assets\yuno_banner_bright_wide.png;assets" `
             --distpath "$PWD\dist" `
             AnimeRenamer.pyw
 

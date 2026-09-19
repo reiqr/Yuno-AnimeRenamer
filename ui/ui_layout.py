@@ -117,7 +117,8 @@ class LayoutMixin:
         form_card = ttk.Frame(form_outer, style='Panel.TFrame', padding=(11, 6))
         form_card.pack(fill='x', padx=1, pady=(0, 1))
         self._clip_card_corners(form_outer, c['bg'], 4)
-        ttk.Label(form_card, text='01  日记源 / FILE SOURCE', style='Section.TLabel').grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 4))
+        self.source_section_label = ttk.Label(form_card, text='01  日记源 / FILE SOURCE', style='Section.TLabel')
+        self.source_section_label.grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 4))
         self.folder_var = tk.StringVar()
         self.title_var = tk.StringVar()
         self.season_var = tk.StringVar(value='1')
@@ -137,20 +138,24 @@ class LayoutMixin:
             label.grid(row=row, column=col, sticky='w', padx=(0, 8), pady=4)
             return label
 
-        field_label('文件夹', 1, 0, 'folder')
-        ttk.Entry(form_card, textvariable=self.folder_var).grid(row=1, column=1, columnspan=5, sticky='ew', pady=4, padx=(0, 2))
-        ttk.Button(form_card, text='浏览', image=self.UI_ICONS['folder'], compound='left',
-                   command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
+        self.folder_label = field_label('文件夹', 1, 0, 'folder')
+        self.folder_entry = ttk.Entry(form_card, textvariable=self.folder_var)
+        self.folder_entry.grid(row=1, column=1, columnspan=5, sticky='ew', pady=4, padx=(0, 2))
+        self.folder_button = ttk.Button(form_card, text='浏览', image=self.UI_ICONS['folder'], compound='left',
+                                        command=self.choose_folder, style='Ghost.TButton')
+        self.folder_button.grid(row=1, column=6, padx=(8, 0))
 
-        field_label('作品', 2, 0, 'title')
-        ttk.Entry(form_card, textvariable=self.title_var, width=26).grid(row=2, column=1, sticky='ew', pady=4, padx=(0, 8))
-        field_label('季度', 2, 2, 'season')
-        ttk.Spinbox(form_card, from_=0, to=99, width=5, textvariable=self.season_var).grid(row=2, column=3, sticky='ew')
-        field_label('规则', 2, 4, 'rule')
-        cb = ttk.Combobox(form_card, values=list(TEMPLATES), textvariable=self.template_name_var, state='readonly')
-        cb.grid(row=2, column=5, sticky='ew')
-        cb.bind('<<ComboboxSelected>>', self.on_template_change)
-        self.scan_btn = ttk.Button(form_card, text='刷新预览', image=self.UI_ICONS['scan'], compound='left',
+        self.title_label = field_label('作品', 2, 0, 'title')
+        self.title_entry = ttk.Entry(form_card, textvariable=self.title_var, width=26)
+        self.title_entry.grid(row=2, column=1, sticky='ew', pady=4, padx=(0, 8))
+        self.season_label = field_label('季度', 2, 2, 'season')
+        self.season_spin = ttk.Spinbox(form_card, from_=0, to=99, width=5, textvariable=self.season_var)
+        self.season_spin.grid(row=2, column=3, sticky='ew')
+        self.rule_label = field_label('规则', 2, 4, 'rule')
+        self.template_combo = ttk.Combobox(form_card, values=list(TEMPLATES), textvariable=self.template_name_var, state='readonly')
+        self.template_combo.grid(row=2, column=5, sticky='ew')
+        self.template_combo.bind('<<ComboboxSelected>>', self.on_template_change)
+        self.scan_btn = ttk.Button(form_card, text='扫描文件', image=self.UI_ICONS['scan'], compound='left',
                                    command=self.scan, style='Primary.TButton')
         self.scan_btn.grid(row=2, column=6, padx=(8, 0))
 
@@ -173,22 +178,30 @@ class LayoutMixin:
         self.output_button.grid(row=4, column=6, padx=(8, 0))
 
         opts = ttk.Frame(form_card, style='Panel.TFrame')
+        self.options_frame = opts
         opts.grid(row=5, column=0, columnspan=7, sticky='ew', pady=(8, 2))
-        ttk.Label(opts, text='OPTIONS', style='Cyan.TLabel').pack(side='left', padx=(0, 10))
+        self.options_label = ttk.Label(opts, text='OPTIONS', style='Cyan.TLabel')
+        self.options_label.pack(side='left', padx=(0, 10))
         toggle_colors = {
             'off_bg': '#1B1620', 'off_fg': '#B7A9B3', 'on_bg': '#46203A', 'on_fg': '#FFF3F8',
             'hover_bg': '#352031', 'press_bg': '#241522', 'border': '#493544', 'accent': c['pink'],
             'disabled_bg': '#17141A', 'disabled_fg': '#6E636B',
         }
         self.option_toggles = []
-        for text, variable in [('子目录', self.recursive_var), ('字幕联动', self.sub_var),
-                               ('语言标签', self.lang_var), ('排序编号', self.force_var)]:
+        self.option_toggle_map = {}
+        for key, text, variable in [('recursive', '子目录', self.recursive_var),
+                                    ('subtitles', '字幕联动', self.sub_var),
+                                    ('language', '语言标签', self.lang_var),
+                                    ('sequence', '排序编号', self.force_var)]:
             toggle = ThemeToggle(opts, text=text, variable=variable, colors=toggle_colors,
                                  font=(self.FONTS['body'], 8, 'bold'))
             toggle.pack(side='left', padx=(0, 8))
             self.option_toggles.append(toggle)
-        ttk.Label(opts, text='起始集', style='MutedPanel.TLabel').pack(side='left', padx=(6, 4))
-        ttk.Spinbox(opts, from_=1, to=9999, textvariable=self.start_var, width=6).pack(side='left')
+            self.option_toggle_map[key] = toggle
+        self.start_label = ttk.Label(opts, text='起始集', style='MutedPanel.TLabel')
+        self.start_label.pack(side='left', padx=(6, 4))
+        self.start_spin = ttk.Spinbox(opts, from_=1, to=9999, textvariable=self.start_var, width=6)
+        self.start_spin.pack(side='left')
         form_card.columnconfigure(1, weight=2)
         form_card.columnconfigure(5, weight=2)
         self._update_conditional_rows()
@@ -197,10 +210,14 @@ class LayoutMixin:
         toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(8, 4))
         self.toolbar = toolbar
         toolbar.pack(fill='x', pady=(6, 5))
-        ttk.Button(toolbar, text='分组', image=self.UI_ICONS['group'], compound='left', command=self.edit_group, style='Secondary.TButton').pack(side='left', padx=(0, 6))
-        ttk.Button(toolbar, text='纠正', image=self.UI_ICONS['edit'], compound='left', command=self.edit_item, style='Secondary.TButton').pack(side='left', padx=(0, 6))
-        ttk.Button(toolbar, text='跳过', image=self.UI_ICONS['skip'], compound='left', command=self.toggle_skip, style='Secondary.TButton').pack(side='left', padx=(0, 6))
-        ttk.Button(toolbar, text='清除', image=self.UI_ICONS['reset'], compound='left', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 6))
+        self.group_btn = ttk.Button(toolbar, text='分组', image=self.UI_ICONS['group'], compound='left', command=self.edit_group, style='Secondary.TButton')
+        self.group_btn.pack(side='left', padx=(0, 6))
+        self.edit_btn = ttk.Button(toolbar, text='纠正', image=self.UI_ICONS['edit'], compound='left', command=self.edit_item, style='Secondary.TButton')
+        self.edit_btn.pack(side='left', padx=(0, 6))
+        self.skip_btn = ttk.Button(toolbar, text='跳过/恢复', image=self.UI_ICONS['skip'], compound='left', command=self.toggle_skip, style='Secondary.TButton')
+        self.skip_btn.pack(side='left', padx=(0, 6))
+        self.clear_btn = ttk.Button(toolbar, text='清除', image=self.UI_ICONS['reset'], compound='left', command=self.clear_override, style='Ghost.TButton')
+        self.clear_btn.pack(side='left', padx=(0, 6))
         self.run_btn = ttk.Button(toolbar, text='改写未来', image=self.UI_ICONS['run'], compound='left',
                                   command=self.execute, state='disabled', style='Primary.TButton')
         self.run_btn.pack(side='right')
@@ -235,7 +252,7 @@ class LayoutMixin:
 
         # One compact information rail replaces the old two-row log/footer stack.
         self.detail_var = tk.StringVar(value='待确认的文件不会执行；悬停查看识别依据，双击可纠正集数。')
-        self.status_var = tk.StringVar(value='选择文件夹，填写作品名，然后扫描未来记录。')
+        self.status_var = tk.StringVar(value='选择或拖入文件夹，填写作品名，然后扫描未来记录。')
         info_rail = tk.Frame(main, bg='#121017', bd=0, highlightthickness=1, highlightbackground='#2A222B')
         self.info_rail = info_rail
         info_rail.pack(fill='x', pady=(0, 5))
@@ -269,16 +286,50 @@ class LayoutMixin:
         self._clip_card_corners(preview_outer, c['bg'], 4)
         preview_head = ttk.Frame(preview_card, style='Panel.TFrame')
         preview_head.pack(fill='x', pady=(0, 5))
-        ttk.Label(preview_head, text='02  未来记录 / RENAME PREVIEW', style='Section.TLabel').pack(side='left')
+        preview_head.columnconfigure(0, weight=1)
+        ttk.Label(preview_head, text='02  未来记录 / RENAME PREVIEW', style='Section.TLabel').grid(
+            row=0, column=0, sticky='w')
         self.preview_legend_var = tk.StringVar(value='READY 0  ·  REVIEW 0  ·  CONFLICT 0')
         ttk.Label(preview_head, textvariable=self.preview_legend_var, style='MutedPanel.TLabel',
-                  font=(self.FONTS['mono'], 8, 'bold')).pack(side='right')
+                  font=(self.FONTS['mono'], 8, 'bold')).grid(
+                      row=0, column=1, sticky='e', padx=(12, 0))
+
+        preview_filters = ttk.Frame(preview_card, style='Panel.TFrame')
+        preview_filters.pack(fill='x', pady=(0, 5))
+        ttk.Label(preview_filters, text='FILTER', style='Cyan.TLabel',
+                  font=(self.FONTS['mono'], 8, 'bold')).pack(side='left', padx=(0, 7))
+        self.preview_query_var = tk.StringVar()
+        self.preview_filter_var = tk.StringVar(value='全部')
+        self.preview_problem_var = tk.BooleanVar(value=False)
+        self.preview_search_entry = ttk.Entry(preview_filters, textvariable=self.preview_query_var, width=26)
+        self.preview_search_entry.pack(side='left', padx=(0, 7))
+        self.preview_filter_combo = ttk.Combobox(
+            preview_filters, textvariable=self.preview_filter_var, state='readonly', width=10,
+            values=['全部', '可执行', '待确认', '冲突/错误', '已跳过'])
+        self.preview_filter_combo.pack(side='left', padx=(0, 7))
+        self.preview_problem_toggle = ThemeToggle(
+            preview_filters, text='只看问题', variable=self.preview_problem_var,
+            colors={
+                'off_bg': '#1B1620', 'off_fg': '#B7A9B3', 'on_bg': '#46203A', 'on_fg': '#FFF3F8',
+                'hover_bg': '#352031', 'press_bg': '#241522', 'border': '#493544', 'accent': c['pink'],
+                'disabled_bg': '#17141A', 'disabled_fg': '#6E636B',
+            }, font=(self.FONTS['body'], 8, 'bold'))
+        self.preview_problem_toggle.pack(side='left', padx=(0, 7))
+        ttk.Button(preview_filters, text='全选当前', command=self.select_visible_rows,
+                   style='Ghost.TButton').pack(side='left')
+        self.preview_visible_var = tk.StringVar(value='SHOW 0 / 0')
+        ttk.Label(preview_filters, textvariable=self.preview_visible_var, style='MutedPanel.TLabel',
+                  font=(self.FONTS['mono'], 8)).pack(side='right')
+        for variable in (self.preview_query_var, self.preview_filter_var, self.preview_problem_var):
+            variable.trace_add('write', self._preview_filter_changed)
 
         preview_shell = tk.Frame(preview_card, bg='#2C222C', bd=0, highlightthickness=1,
                                  highlightbackground='#2C222C')
         preview_shell.pack(fill='both', expand=True)
         preview = ttk.Frame(preview_shell, style='Panel.TFrame')
-        preview.pack(fill='both', expand=True, padx=1, pady=1)
+        # The shell already owns the 1px boundary.  Avoid a second inset so the
+        # heading, table viewport and outer card share the same visual axis.
+        preview.pack(fill='both', expand=True)
         cols = ('kind', 'old', 'detected', 'new', 'status')
         self.tree = ttk.Treeview(preview, columns=cols, show='tree headings', selectmode='extended')
         self.tree.heading('#0', text='GROUP')
@@ -323,7 +374,9 @@ class LayoutMixin:
         self.empty_state = tk.Frame(preview, bg='#121017', bd=0, highlightthickness=0)
         self.empty_state_width = 390
         self.empty_state_height = 116
-        self.empty_state.place(relx=0.5, rely=0.53, anchor='center',
+        # Center against the actual preview viewport rather than biasing the empty
+        # state downward; this keeps the phone/text group aligned after resizes.
+        self.empty_state.place(relx=0.5, rely=0.50, anchor='center',
                                width=self.empty_state_width, height=self.empty_state_height)
         self.empty_phone_photo = self._load_photo('empty_phone.png')
         if self.empty_phone_photo:

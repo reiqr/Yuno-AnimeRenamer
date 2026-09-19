@@ -96,6 +96,49 @@ class UiDisplayGuardTests(unittest.TestCase):
         self.assertLessEqual(max(sizes), 20)
 
 
+    def test_preview_alignment_uses_single_boundary_and_full_width_columns(self):
+        root = Path(__file__).resolve().parents[1]
+        layout = (root / 'ui' / 'ui_layout.py').read_text(encoding='utf-8')
+        view = (root / 'ui' / 'ui_view.py').read_text(encoding='utf-8')
+        self.assertIn("preview.pack(fill='both', expand=True)", layout)
+        self.assertIn("self.empty_state.place(relx=0.5, rely=0.50", layout)
+        self.assertIn('self.tree.winfo_width() - 2', view)
+        self.assertNotIn('self.tree.winfo_width() - 12', view)
+
+    def test_larger_window_native_folder_drop_and_preview_filters_are_present(self):
+        root = Path(__file__).resolve().parents[1]
+        app = (root / 'AnimeRenamer.pyw').read_text(encoding='utf-8')
+        actions = (root / 'ui' / 'ui_actions.py').read_text(encoding='utf-8')
+        layout = (root / 'ui' / 'ui_layout.py').read_text(encoding='utf-8')
+        self.assertIn('min(1392', app)
+        self.assertIn('min(864', app)
+        self.assertIn('DragAcceptFiles', actions)
+        self.assertIn('SetWindowLongPtrW', actions)
+        self.assertNotIn('tkinterdnd', actions.casefold())
+        self.assertIn("self.preview_filter_var = tk.StringVar(value='全部')", layout)
+        self.assertIn("text='只看问题'", layout)
+        self.assertIn('command=self.select_visible_rows', layout)
+        self.assertIn("text='跳过/恢复'", layout)
+
+    def test_exe_builds_bundle_only_explicit_runtime_assets(self):
+        root = Path(__file__).resolve().parents[1]
+        batch = (root / 'build_exe.bat').read_text(encoding='utf-8')
+        workflow = (root / '.github' / 'workflows' / 'python-app.yml').read_text(encoding='utf-8')
+        runtime_assets = [
+            'app_icon.png', 'empty_phone.png', 'yuno_sidebar.png',
+            'yuno_banner_dark.png', 'yuno_banner_dark_wide.png',
+            'yuno_banner_bright.png', 'yuno_banner_bright_wide.png',
+        ]
+        self.assertNotIn('assets;assets', batch)
+        self.assertNotIn('$PWD\\assets;assets', workflow)
+        for name in runtime_assets:
+            self.assertIn(name, batch)
+            self.assertIn(name, workflow)
+        for dev_only in ['yuno_sidebar_hd.png', 'yuno_banner.png', 'yuno_banner_wide.png']:
+            self.assertNotIn(f'--add-data "%CD%\\assets\\{dev_only};assets"', batch)
+            self.assertNotIn(f'--add-data "$PWD\\assets\\{dev_only};assets"', workflow)
+
+
 
 class ReleasePackagingTests(unittest.TestCase):
     BUILD_NO = 42

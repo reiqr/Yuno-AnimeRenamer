@@ -146,6 +146,21 @@ class LightNovelGuiTests(unittest.TestCase):
         self.assertEqual(tuple(self.app._template_combo.cget('values')), tuple(NOVEL_TEMPLATES))
         self.assertIn('{volume:', self.app.template_var.get())
         self.assertIn('轻小说模式', self.app.status_var.get())
+        self.assertEqual(self.app.source_section_label.cget('text'), '01  书库源 / BOOK SOURCE')
+        self.assertEqual(self.app.title_label.cget('text'), '系列')
+        self.assertEqual(self.app.start_label.cget('text'), '起始卷')
+        self.assertEqual(self.app.season_label.winfo_manager(), '')
+        self.assertEqual(self.app.option_toggle_map['subtitles'].winfo_manager(), '')
+        self.assertEqual(self.app.option_toggle_map['language'].winfo_manager(), '')
+        self.assertIn('卷信息', self.app.tree.heading('detected', 'text'))
+        self.assertEqual(self.app.edit_btn.cget('text'), '纠正卷')
+
+        self.app.content_type_var.set('番剧')
+        self.app.on_content_type_change()
+        self.assertEqual(self.app.source_section_label.cget('text'), '01  日记源 / FILE SOURCE')
+        self.assertEqual(self.app.season_label.winfo_manager(), 'grid')
+        self.assertEqual(self.app.option_toggle_map['subtitles'].winfo_manager(), 'pack')
+        self.assertEqual(self.app.start_label.cget('text'), '起始集')
 
 
 if __name__ == '__main__':

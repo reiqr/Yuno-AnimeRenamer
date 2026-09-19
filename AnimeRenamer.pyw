@@ -91,16 +91,17 @@ class App(LightNovelMixin, ThemeMixin, DialogMixin, StyleMixin, LayoutMixin, Vie
         self.protocol('WM_DELETE_WINDOW', self.close)
         self.after(80, self._apply_window_chrome)
         self.after(150, self.check_recovery)
+        self.after(220, self._enable_folder_drop)
 
     def _set_initial_geometry(self):
-        """Open at a compact, centered size that adapts to the current monitor."""
+        """Open about 20% larger than Preview19 while staying inside the monitor."""
         self.update_idletasks()
         sw = max(1024, self.winfo_screenwidth())
         sh = max(720, self.winfo_screenheight())
-        # DPI awareness keeps this a genuinely smaller window instead of a low-resolution
-        # window bitmap that Windows later stretches.
-        width = min(1160, max(1000, int(sw * 0.66)))
-        height = min(720, max(680, int(sh * 0.72)))
+        # Preview19 used 1160x720 as its preferred ceiling.  Keep the same adaptive
+        # behaviour but raise the preferred working area by roughly 20%.
+        width = min(1392, max(1200, int(sw * 0.79)))
+        height = min(864, max(816, int(sh * 0.86)))
         width = min(width, max(960, sw - 70))
         height = min(height, max(640, sh - 60))
         x = max(0, (sw - width) // 2)

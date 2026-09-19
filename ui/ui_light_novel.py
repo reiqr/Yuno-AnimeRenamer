@@ -394,10 +394,7 @@ class LightNovelMixin:
         # action toolbar. Reserve a dedicated area in the source-card header so both
         # “番剧” and “轻小说” remain fully visible at the normal application width.
         form_card = self.mode_combo.master
-        for widget in form_card.winfo_children():
-            if isinstance(widget, ttk.Label) and str(widget.cget('text')) == '01  日记源 / FILE SOURCE':
-                widget.grid_configure(columnspan=4)
-                break
+        self.source_section_label.grid_configure(columnspan=4)
         self.content_type_frame = ttk.Frame(form_card, style='Panel.TFrame')
         self.content_type_frame.grid(row=0, column=4, columnspan=3, sticky='e', pady=(0, 4))
         ttk.Label(self.content_type_frame, text='内容', style='Cyan.TLabel').pack(
@@ -407,18 +404,42 @@ class LightNovelMixin:
             state='readonly', width=6)
         self.content_type_combo.pack(side='left')
         self.content_type_combo.bind('<<ComboboxSelected>>', self.on_content_type_change)
-        self._template_combo = self._find_template_combo()
+        self._template_combo = self.template_combo
         self.content_type_var.trace_add('write', self._novel_mode_dirty)
+        self._apply_content_mode_ui(False)
 
-    def _find_template_combo(self):
-        wanted = str(self.template_name_var)
-        stack = list(self.winfo_children())
-        while stack:
-            widget = stack.pop()
-            if isinstance(widget, ttk.Combobox) and str(widget.cget('textvariable')) == wanted:
-                return widget
-            stack.extend(widget.winfo_children())
-        return None
+    def _apply_content_mode_ui(self, novel):
+        self.source_section_label.configure(text='01  书库源 / BOOK SOURCE' if novel else '01  日记源 / FILE SOURCE')
+        self.title_label.configure(text='系列' if novel else '作品')
+        self.rule_label.configure(text='命名' if novel else '规则')
+        self.start_label.configure(text='起始卷' if novel else '起始集')
+        self.option_toggle_map['sequence'].configure(text='顺序编号' if novel else '排序编号')
+        self.template_hint.configure(
+            text='{title} / {volume} / {volume_title} / {part}' if novel
+            else '{title}  /  {season}  /  {episode}')
+        self.edit_btn.configure(text='纠正卷' if novel else '纠正')
+
+        if novel:
+            self.season_label.grid_remove()
+            self.season_spin.grid_remove()
+            self.rule_label.grid(row=2, column=2, sticky='w', padx=(0, 8), pady=4)
+            self.template_combo.grid(row=2, column=3, columnspan=3, sticky='ew')
+            self.option_toggle_map['subtitles'].pack_forget()
+            self.option_toggle_map['language'].pack_forget()
+            self.tree.heading('#0', text='SERIES / 分组')
+            self.tree.heading('detected', text='VOLUME / 卷信息')
+        else:
+            self.season_label.grid(row=2, column=2, sticky='w', padx=(0, 8), pady=4)
+            self.season_spin.grid(row=2, column=3, sticky='ew')
+            self.rule_label.grid(row=2, column=4, sticky='w', padx=(0, 8), pady=4)
+            self.template_combo.grid(row=2, column=5, columnspan=1, sticky='ew')
+            sequence = self.option_toggle_map['sequence']
+            subtitles = self.option_toggle_map['subtitles']
+            language = self.option_toggle_map['language']
+            subtitles.pack(side='left', padx=(0, 8), before=sequence)
+            language.pack(side='left', padx=(0, 8), before=sequence)
+            self.tree.heading('#0', text='GROUP')
+            self.tree.heading('detected', text='MATCH')
 
     def _novel_mode_dirty(self, *_):
         self.groups.clear()
@@ -436,6 +457,7 @@ class LightNovelMixin:
         name = next(iter(templates))
         self.template_name_var.set(name)
         self.template_var.set(templates[name])
+        self._apply_content_mode_ui(novel)
         self.status_var.set('轻小说模式：支持 EPUB / MOBI / AZW3 / PDF / TXT / CBZ。' if novel
                             else '已切换回番剧模式。')
         self.detail_var.set('双击可纠正卷数；卷标题与上/下册会自动保留。' if novel
@@ -475,6 +497,7 @@ class LightNovelMixin:
         self.status_var.set('正在识别轻小说文件…')
         self._set_empty_state('正在读取书库…', '正在分析卷数、卷标题和上下册，请稍候。', visible=True)
         self._start_task(lambda _: build_novel_plan(**args), self.render_plan)
+        self._mark_scan_started()
 
     def edit_item(self):
         if not hasattr(self, 'content_type_var') or self.content_type_var.get() != '轻小说':
