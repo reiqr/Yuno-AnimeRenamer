@@ -11,7 +11,9 @@ class StyleMixin:
             'panel2': '#1B1620',
             'panel3': '#231A25',
             'border': '#3A2835',
-            'text': '#F6EEF4',
+            'text_strong': '#F7F3F6',
+            'text': '#ECE7EA',
+            'text_secondary': '#C9C0C6',
             'muted': '#A89BA6',
             'pink': '#FF4F91',
             'pink2': '#D82D72',
@@ -26,12 +28,13 @@ class StyleMixin:
         self.configure(bg=c['bg'])
         self._theme_images = []
         self.UI_ICONS = {}
+        self._register_bundled_fonts()
         self.FONTS = {
-            'body': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'PingFang SC', 'Segoe UI'),
-            'display': self._pick_font('Microsoft YaHei', 'Microsoft YaHei UI', 'Microsoft JhengHei UI', 'Segoe UI'),
+            'body': self._pick_font('Noto Sans CJK SC', 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Segoe UI'),
+            'display': self._pick_font('Noto Sans CJK SC', 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI'),
             'latin': self._pick_font('Segoe UI Variable Display', 'Segoe UI Semibold', 'Bahnschrift', 'Segoe UI', 'Arial'),
-            'jp': self._pick_font('Yu Gothic UI', 'Yu Gothic', 'Meiryo UI', 'Noto Sans CJK JP', 'Noto Sans JP', 'Microsoft YaHei UI'),
-            'mono': self._pick_font('Cascadia Code', 'Cascadia Mono', 'Consolas', 'JetBrains Mono', 'DejaVu Sans Mono'),
+            'jp': self._pick_font('Yu Gothic UI', 'Yu Gothic', 'Meiryo UI', 'Noto Sans CJK JP', 'Noto Sans JP', 'Noto Sans CJK SC'),
+            'mono': self._pick_font('Noto Sans Mono CJK SC', 'Cascadia Code', 'Cascadia Mono', 'Consolas', 'JetBrains Mono', 'DejaVu Sans Mono'),
         }
         self.option_add('*Font', (self.FONTS['body'], 9))
         self.UI_ICONS = {
@@ -83,13 +86,13 @@ class StyleMixin:
         style.configure('MutedPanel.TLabel', background=c['panel'], foreground=c['muted'])
         style.configure('Sidebar.TLabel', background='#110C14', foreground=c['text'])
         style.configure('SidebarMuted.TLabel', background='#110C14', foreground='#A98E9E')
-        style.configure('Hero.TLabel', background='#110C14', foreground='#FFF1F7',
+        style.configure('Hero.TLabel', background='#110C14', foreground=c['text_strong'],
                         font=(self.FONTS['display'], 18, 'bold'))
         style.configure('HeroSub.TLabel', background='#110C14', foreground=c['pink'],
                         font=(self.FONTS['mono'], 8, 'bold'))
-        style.configure('Title.TLabel', background=c['bg'], foreground=c['text'],
+        style.configure('Title.TLabel', background=c['bg'], foreground=c['text_strong'],
                         font=(self.FONTS['display'], 18, 'bold'))
-        style.configure('Section.TLabel', background=c['panel'], foreground=c['text'],
+        style.configure('Section.TLabel', background=c['panel'], foreground=c['text_strong'],
                         font=(self.FONTS['body'], 10, 'bold'))
         style.configure('Accent.TLabel', background=c['panel'], foreground=c['pink'])
         style.configure('Cyan.TLabel', background=c['panel2'], foreground=c['cyan'],
@@ -121,9 +124,9 @@ class StyleMixin:
                   lightcolor=[('focus', c['cyan']), ('!focus', '#4A3341')],
                   darkcolor=[('focus', c['cyan']), ('!focus', '#4A3341')],
                   arrowcolor=[('active', '#FFFFFF'), ('!active', c['cyan'])])
-        style.configure('Option.TCheckbutton', background=c['panel'], foreground='#DCCFD8', padding=(2, 2))
+        style.configure('Option.TCheckbutton', background=c['panel'], foreground=c['text_secondary'], padding=(2, 2))
         style.map('Option.TCheckbutton', background=[('active', c['panel'])],
-                  foreground=[('active', '#FFFFFF'), ('selected', '#FFF0F6')],
+                  foreground=[('active', c['text_strong']), ('selected', c['text_strong'])],
                   indicatorcolor=[('selected', c['pink2']), ('!selected', '#493943')])
 
         style.configure('TCheckbutton', background=c['panel'], foreground=c['text'], padding=2)
@@ -148,7 +151,7 @@ class StyleMixin:
                         lightcolor='#483340', darkcolor='#483340')
         style.map('Ghost.TButton', background=[('pressed', '#171119'), ('active', c['panel3'])],
                   foreground=[('pressed', '#FFFFFF'), ('active', c['text'])])
-        style.configure('Secondary.TButton', background='#231923', foreground='#EEDCE7', bordercolor='#68405A',
+        style.configure('Secondary.TButton', background='#231923', foreground=c['text'], bordercolor='#68405A',
                         lightcolor='#68405A', darkcolor='#68405A', padding=(9, 7))
         style.map('Secondary.TButton', background=[('pressed', '#1B121B'), ('active', '#352234'), ('disabled', '#17141A')],
                   foreground=[('pressed', '#FFFFFF'), ('active', '#FFFFFF'), ('disabled', '#655C65')],
@@ -159,9 +162,9 @@ class StyleMixin:
                   foreground=[('pressed', '#FFFFFF')])
 
         style.configure('Treeview', rowheight=28, relief='flat', borderwidth=0,
-                        background='#121017', fieldbackground='#121017', foreground='#EDE5EC',
+                        background='#121017', fieldbackground='#121017', foreground=c['text'],
                         font=(self.FONTS['body'], 9))
-        style.configure('Treeview.Heading', background='#211923', foreground='#F7EAF3',
+        style.configure('Treeview.Heading', background='#211923', foreground=c['text_strong'],
                         relief='flat', borderwidth=0, padding=(5, 7), font=(self.FONTS['body'], 9, 'bold'))
         style.map('Treeview', background=[('selected', '#6A2850')], foreground=[('selected', '#FFFFFF')])
         style.map('Treeview.Heading', background=[('active', '#38243A')], foreground=[('active', '#FFFFFF')])

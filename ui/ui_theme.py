@@ -111,13 +111,50 @@ class ThemeMixin:
         except Exception:
             pass
 
+    def _register_bundled_fonts(self):
+        """Register bundled Noto fonts for this process only on Windows."""
+        self._bundled_font_paths = []
+        self._bundled_font_families = set()
+        if not sys.platform.startswith('win'):
+            return
+        try:
+            import ctypes
+            add_font = ctypes.windll.gdi32.AddFontResourceExW
+            add_font.argtypes = [ctypes.c_wchar_p, ctypes.c_uint, ctypes.c_void_p]
+            add_font.restype = ctypes.c_int
+            fr_private = 0x10
+            for name in (
+                'fonts/NotoSansCJKsc-Regular.otf',
+                'fonts/NotoSansCJKsc-Bold.otf',
+                'fonts/NotoSansMonoCJKsc-Regular.otf',
+                'fonts/NotoSansMonoCJKsc-Bold.otf',
+            ):
+                path = self._asset_path(name)
+                if path and add_font(str(path), fr_private, None):
+                    self._bundled_font_paths.append(path)
+                    if 'Mono' in name:
+                        self._bundled_font_families.add('Noto Sans Mono CJK SC')
+                    else:
+                        self._bundled_font_families.add('Noto Sans CJK SC')
+            if self._bundled_font_paths:
+                try:
+                    ctypes.windll.user32.SendMessageW(0xFFFF, 0x001D, 0, 0)
+                except OSError:
+                    pass
+        except Exception:
+            self._bundled_font_paths = []
+            self._bundled_font_families = set()
+
     def _pick_font(self, *preferred):
         """Return the first installed font family, with a safe Tk fallback."""
         try:
             installed = {name.casefold(): name for name in tkfont.families(self)}
         except tk.TclError:
             installed = {}
+        bundled = {name.casefold(): name for name in getattr(self, '_bundled_font_families', set())}
         for name in preferred:
+            if name.casefold() in bundled:
+                return name
             hit = installed.get(name.casefold())
             if hit:
                 return hit
@@ -235,9 +272,9 @@ class ThemeMixin:
         canvas.create_rectangle(max(420, int(width * 0.52)), 0, width, height,
                                 fill=veil_fill, stipple=veil_stipple, outline='', tags='overlay')
         tx = max(470, int(width * 0.58))
-        title_fill = '#FFF5F9' if variant == 'bright' else '#CFC3CA'
+        title_fill = self.COLORS.get('text_strong', '#F7F3F6') if variant == 'bright' else '#CFC3CA'
         subtitle_fill = '#FF79AE' if variant == 'bright' else '#B84D76'
-        step_fill = '#D8CFD4' if variant == 'bright' else '#8E838B'
+        step_fill = self.COLORS.get('text_secondary', '#C9C0C6') if variant == 'bright' else '#8E838B'
         canvas.create_text(tx, 17, text='ANIME RENAMER', anchor='w', fill=title_fill,
                            font=(self.FONTS['latin'], 17, 'bold'), tags='overlay')
         canvas.create_text(tx, 37, text='未来日记 · RENAME TERMINAL', anchor='w', fill=subtitle_fill,

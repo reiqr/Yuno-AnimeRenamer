@@ -72,6 +72,10 @@ jobs:
             python -m pip install -r requirements.txt
           }
 
+      - name: Prepare bundled Noto CJK fonts
+        shell: pwsh
+        run: ./tools/download_theme_fonts.ps1
+
       - name: Build versioned Windows EXE
         shell: pwsh
         run: |

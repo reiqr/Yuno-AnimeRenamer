@@ -21,6 +21,10 @@ dist/
 .vscode/
 *.log
 
+# Downloaded theme font binaries (fetched locally/CI during build)
+assets/fonts/*.otf
+assets/fonts/OFL.txt
+
 # Operating system files
 Thumbs.db
 Desktop.ini

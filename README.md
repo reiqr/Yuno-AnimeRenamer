@@ -202,6 +202,9 @@ python tools/package_release.py
 
 ## Future Diary UI 当前构建说明
 
+- Windows 构建会准备并内嵌 `Noto Sans CJK SC` Regular/Bold 与 `Noto Sans Mono CJK SC` Regular/Bold。程序通过 Windows 私有字体注册仅对当前进程加载，不写入系统 Fonts 目录。
+- 主中文正文/白色说明优先使用 Noto Sans CJK SC；终端类英文与编号优先使用 Noto Sans Mono CJK SC。粉色、青色、黄色、红色等现有状态色保持不变，只重新整理中性白字层级。
+- `tools/download_theme_fonts.ps1` 从 Noto CJK 官方仓库下载字体与 OFL 1.1 许可文件；本地 `build_exe.bat` 缺字体时会自动准备，GitHub Actions 构建也会执行同一步骤。
 - 在导入 Tkinter、创建首个窗口之前启用 Windows Per-Monitor DPI 感知，避免系统对整个 Tk 窗口做位图拉伸造成模糊。
 - UI 字体只从系统已安装字体中选择；中文优先 `Microsoft YaHei UI`，拉丁标题优先 `Bahnschrift / Segoe UI`，日文优先 `Yu Gothic UI`，等宽标签优先 `Cascadia Mono / Consolas`。显式字号保持在紧凑可读区间，不捆绑字体文件。
 - 发布脚本会拒绝将 `.ttf/.otf/.ttc/.woff/.woff2` 等字体文件打入发布包，避免字体授权与体积问题。

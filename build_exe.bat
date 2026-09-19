@@ -21,6 +21,23 @@ set "BUILD_NO="
 for /f %%I in ('git rev-list --count HEAD 2^>nul') do set "BUILD_NO=%%I"
 if not defined BUILD_NO set "BUILD_NO=0"
 
+set "THEME_FONT_REG=assets\fonts\NotoSansCJKsc-Regular.otf"
+set "THEME_FONT_BOLD=assets\fonts\NotoSansCJKsc-Bold.otf"
+set "THEME_MONO_REG=assets\fonts\NotoSansMonoCJKsc-Regular.otf"
+set "THEME_MONO_BOLD=assets\fonts\NotoSansMonoCJKsc-Bold.otf"
+if not exist "%THEME_FONT_REG%" goto :prepare_fonts
+if not exist "%THEME_FONT_BOLD%" goto :prepare_fonts
+if not exist "%THEME_MONO_REG%" goto :prepare_fonts
+if not exist "%THEME_MONO_BOLD%" goto :prepare_fonts
+goto :fonts_ready
+
+:prepare_fonts
+echo.
+echo Preparing bundled Noto CJK theme fonts...
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\download_theme_fonts.ps1"
+if errorlevel 1 goto :font_download_error
+
+:fonts_ready
 rem Only clear generated build cache/spec files. Never delete the whole dist directory.
 if exist build rmdir /s /q build
 if exist AnimeRenamer.spec del /q AnimeRenamer.spec
@@ -113,6 +130,12 @@ echo.
 echo Invalid release version.
 echo Please use x.y.z, for example 0.3.1.
 echo Press Enter at the version prompt to use the current source version automatically.
+goto :fail
+
+:font_download_error
+echo.
+echo Failed to download bundled Noto CJK theme fonts.
+echo Check the network connection, then run tools\download_theme_fonts.ps1 manually.
 goto :fail
 
 :version_read_error

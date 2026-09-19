@@ -95,6 +95,15 @@ class UiDisplayGuardTests(unittest.TestCase):
         self.assertGreaterEqual(min(sizes), 7)
         self.assertLessEqual(max(sizes), 20)
 
+    def test_bundled_noto_fonts_are_registered_privately(self):
+        root = Path(__file__).resolve().parents[1]
+        theme = (root / 'ui' / 'ui_theme.py').read_text(encoding='utf-8')
+        styles = (root / 'ui' / 'ui_styles.py').read_text(encoding='utf-8')
+        self.assertIn('AddFontResourceExW', theme)
+        self.assertIn('fr_private = 0x10', theme)
+        self.assertIn("'Noto Sans CJK SC'", styles)
+        self.assertIn("'Noto Sans Mono CJK SC'", styles)
+
 
 class ReleasePackagingTests(unittest.TestCase):
     BUILD_NO = 42
@@ -155,6 +164,29 @@ class ReleasePackagingTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, '当前版本不一致'):
                         release.package()
 
+    def test_approved_theme_fonts_are_included_when_present(self):
+        with tempfile.TemporaryDirectory(prefix='anime_release_theme_font_') as td:
+            root = Path(td)
+            assets, current_exe = self._make_fixture(root)
+            fonts = assets / 'fonts'
+            fonts.mkdir()
+            for rel in sorted(release.APPROVED_BUNDLED_FONTS):
+                (root / rel).write_bytes(b'approved-font')
+            (root / release.FONT_LICENSE).write_text('OFL', encoding='utf-8')
+            env = {
+                'ANIMERENAMER_BUILD_NUMBER': str(self.BUILD_NO),
+                'ANIMERENAMER_EXE_NAME': current_exe,
+            }
+            with patch.object(release, '__file__', str(root / 'package_release.py')):
+                with patch.dict(os.environ, env, clear=False):
+                    archive = release.package()
+            with zipfile.ZipFile(archive) as z:
+                names = set(z.namelist())
+            prefix = f'AnimeRenamer_v{core.VERSION}/'
+            for rel in release.APPROVED_BUNDLED_FONTS:
+                self.assertIn(prefix + rel, names)
+            self.assertIn(prefix + release.FONT_LICENSE, names)
+
     def test_font_asset_is_rejected_from_release(self):
         with tempfile.TemporaryDirectory(prefix='anime_release_font_') as td:
             root = Path(td)
@@ -166,7 +198,7 @@ class ReleasePackagingTests(unittest.TestCase):
             }
             with patch.object(release, '__file__', str(root / 'package_release.py')):
                 with patch.dict(os.environ, env, clear=False):
-                    with self.assertRaisesRegex(RuntimeError, '字体文件'):
+                    with self.assertRaisesRegex(RuntimeError, '未批准字体文件'):
                         release.package()
 
 
