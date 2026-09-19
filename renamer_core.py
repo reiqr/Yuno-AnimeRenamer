@@ -1,40 +1,38 @@
+"""Offline detection and preview planning. Never changes media files."""
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import re
-import tempfile
-import uuid
-from dataclasses import dataclass, asdict
+from collections import Counter
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable, Optional
 
+from file_operations import execute_plan, undo_last, recover_pending, pending_operation
+
+VERSION = '0.3.0'
 VIDEO_EXTS = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.m4v', '.ts', '.m2ts', '.webm'}
-SUB_EXTS = {'.ass', '.ssa', '.srt', '.vtt', '.sup', '.sub'}
-MEDIA_EXTS = VIDEO_EXTS | SUB_EXTS
+SUB_EXTS = {'.ass', '.ssa', '.srt', '.vtt', '.sup', '.sub', '.idx'}
+LANG_TAGS = ['zh-hans', 'zh-hant', 'zh-cn', 'zh-tw', 'chs', 'cht', 'sc', 'tc',
+             'jpn', 'jp', 'eng', 'en', 'chi', 'zho', '简中', '繁中', '简体', '繁体']
+READY = '可执行'
 
-LANG_TAGS = [
-    'zh-hans', 'zh-hant', 'zh-cn', 'zh-tw', 'chs', 'cht', 'sc', 'tc',
-    'jpn', 'jp', 'eng', 'en', 'chi', 'zho', '简中', '繁中', '简体', '繁体'
-]
-
-EXTRA_PATTERNS = [
-    ('NCOP', re.compile(r'(?i)(?:^|[\s._\-\[\(])NC\s*OP(?:$|[\s._\-\]\)])')),
-    ('NCED', re.compile(r'(?i)(?:^|[\s._\-\[\(])NC\s*ED(?:$|[\s._\-\]\)])')),
-    ('OVA', re.compile(r'(?i)(?:^|[\s._\-\[\(])OVA(?:\s*0*(\d+))?(?:$|[\s._\-\]\)])')),
-    ('OAD', re.compile(r'(?i)(?:^|[\s._\-\[\(])OAD(?:\s*0*(\d+))?(?:$|[\s._\-\]\)])')),
-    ('SP', re.compile(r'(?i)(?:^|[\s._\-\[\(])(?:SP|SPECIAL)(?:\s*0*(\d+))?(?:$|[\s._\-\]\)])')),
-    ('PV', re.compile(r'(?i)(?:^|[\s._\-\[\(])PV(?:\s*0*(\d+))?(?:$|[\s._\-\]\)])')),
-]
 
 @dataclass
 class Detection:
-    episode: Optional[int] = None
+    episode: int | str | None = None
     confidence: int = 0
-    reason: str = ''
-    special: Optional[str] = None
-    special_index: Optional[int] = None
+    reason: str = '未识别'
+    special: str | None = None
+    special_index: int | None = None
+    season: int | None = None
+
+
+@dataclass
+class GroupSettings:
+    title: str = ''
+    season: int | None = None
+    start: int | None = None
+
 
 @dataclass
 class RenameItem:
@@ -44,428 +42,291 @@ class RenameItem:
     detected: str
     confidence: int
     status: str
-    episode: Optional[int] = None
-    special: Optional[str] = None
+    episode: int | str | None = None
+    special: str | None = None
+    group: str = ''
+    group_id: str = ''
+    reason: str = ''
+    signature: tuple = ()
+    mode: str = 'rename'
 
 
-def natural_key(text: str):
-    parts = re.split(r'(\d+)', text.lower())
-    return [int(p) if p.isdigit() else p for p in parts]
+def natural_key(text):
+    return [int(x) if x.isdigit() else x for x in re.split(r'(\d+)', str(text).lower())]
 
 
-def _valid_episode(n: int) -> bool:
-    # Do not blacklist values such as 8/10/12/24/60: they are valid episode numbers.
-    # Technical numbers are filtered by their surrounding text instead.
-    return 0 < n <= 9999
+def _number(raw):
+    whole, dot, fractional = raw.partition('.')
+    number = int(whole)
+    if not 0 <= number <= 9999:
+        raise ValueError('集数须在 0–9999 之间')
+    if dot:
+        fractional = fractional.rstrip('0')
+    return f'{number}.{fractional}' if fractional else number
 
 
-_TECHNICAL_TOKEN_PATTERNS = [
-    # Video codecs. These are the most dangerous because the trailing 264/265/266
-    # otherwise look exactly like a valid episode number.
-    re.compile(r'(?i)(?<![A-Za-z0-9])(?:x|h)\s*26[456](?!\d)'),
-    re.compile(r'(?i)(?<![A-Za-z0-9])(?:AVC|HEVC|H\.26[456]|X\.26[456])(?![A-Za-z0-9])'),
-    re.compile(r'(?i)(?<![A-Za-z0-9])(?:AV1|VP8|VP9)(?![A-Za-z0-9])'),
-    # Resolution / bit depth / frame rate / refresh rate / bit rate.
-    re.compile(r'(?i)(?<!\d)\d{3,4}\s*[x×]\s*\d{3,4}(?!\d)'),
-    re.compile(r'(?i)(?<!\d)\d{3,4}\s*[pi](?![A-Za-z])'),
-    re.compile(r'(?i)(?<!\d)\d+(?:\.\d+)?\s*(?:bit|fps|hz|kbps|mbps)(?![A-Za-z])'),
-]
+def parse_override(text):
+    """Accept 03, 12.5, E03, NCOP02 or SP01."""
+    text = text.strip().upper()
+    m = re.fullmatch(r'(NCOP|NCED|OVA|OAD|SP|PV)\s*(\d{1,4})?', text)
+    if m:
+        return Detection(confidence=100, reason='手动纠正', special=m[1],
+                         special_index=int(m[2] or 1))
+    m = re.fullmatch(r'(?:E|EP)?(\d{1,4}(?:\.\d{1,3})?)', text)
+    if not m:
+        raise ValueError('请输入集数（如 03、12.5）或特别篇编号（如 SP01、NCOP02）')
+    return Detection(episode=_number(m[1]), confidence=100, reason='手动纠正')
 
 
-def _strip_technical_tokens(stem: str) -> str:
-    """Remove common release technical parameters before generic number matching.
-
-    Explicit episode forms (S01E03 / E03 / 第3集 / [03]) are parsed from the
-    original stem first. Generic trailing/standalone-number rules use this cleaned
-    string so x265, h264, 1080p, 10bit, 23.976fps, etc. cannot outrank a real
-    episode candidate.
-    """
-    cleaned = stem
-    for pat in _TECHNICAL_TOKEN_PATTERNS:
-        cleaned = pat.sub(' ', cleaned)
-    return re.sub(r'\s+', ' ', cleaned).strip()
-
-
-def detect_language_suffix(stem: str) -> str:
-    low = stem.lower()
+def detect_language_suffix(stem):
     for tag in LANG_TAGS:
-        t = tag.lower()
-        # Prefer delimiter-bounded language tags.
-        if re.search(rf'(?i)(?:^|[. _\-\[\(]){re.escape(t)}(?:$|[. _\-\]\)])', low):
-            normalized = tag
-            if normalized in {'简中', '简体'}:
-                return 'zh-Hans'
-            if normalized in {'繁中', '繁体'}:
-                return 'zh-Hant'
-            return normalized
+        if re.search(rf'(?i)(?:^|[. _\-\[(]){re.escape(tag)}(?:$|[. _\-\])])', stem):
+            return {'简中': 'zh-Hans', '简体': 'zh-Hans', '繁中': 'zh-Hant',
+                    '繁体': 'zh-Hant'}.get(tag, tag)
     return ''
 
 
-def detect_episode(filename: str) -> Detection:
+def _clean(stem):
+    patterns = [
+        r'(?<![A-Za-z0-9])(?:[xh][ .]*26[456]|AV1|VP[89]|HEVC|AVC)(?!\d)',
+        r'(?<!\d)\d{3,4}\s*[x×]\s*\d{3,4}(?!\d)',
+        r'(?<!\d)\d{3,4}\s*[pi](?![A-Za-z])',
+        r'(?<!\d)\d+(?:\.\d+)?\s*(?:bit|fps|hz|kbps|mbps)(?![A-Za-z])',
+        r'(?:AAC|FLAC|DDP|DD|DTS|AC3|EAC3|TRUEHD)[ ._-]*(?:\d\.\d)?',
+        r'(?<![A-Za-z0-9])(?:2\.0|5\.1|7\.1)(?!\d)',
+        r'[\[(](?:480|576|720|1080|1440|2160|4320)[\])]',
+        r'[\[(](?:19|20)\d{2}[\])]',
+        r'[\[(][A-Fa-f0-9]{8}[\])]',
+    ]
+    for pattern in patterns:
+        stem = re.sub(pattern, ' ', stem, flags=re.I)
+    return stem.strip()
+
+
+def detect_episode(filename):
     stem = Path(filename).stem.strip()
-
-    # Pure numeric file names are very common in anime folders: 01.mkv, 002.ass, etc.
-    # Give them the highest regular-episode confidence so mixed folders work reliably.
-    m = re.fullmatch(r'0*(\d{1,4})', stem)
-    if m:
-        try:
-            n = int(m.group(1))
-        except ValueError:
-            n = 0
-        if _valid_episode(n):
-            return Detection(episode=n, confidence=100, reason='纯数字文件名')
-
-    for special, pat in EXTRA_PATTERNS:
-        m = pat.search(stem)
-        if m:
-            idx = None
-            if m.lastindex and m.group(1):
-                try:
-                    idx = int(m.group(1))
-                except ValueError:
-                    pass
-            return Detection(confidence=98, reason=special, special=special, special_index=idx)
-
-    candidates: list[tuple[int, int, str]] = []
-
-    def add(score: int, raw: str, reason: str):
-        try:
-            n = int(raw)
-        except (TypeError, ValueError):
-            return
-        if _valid_episode(n):
-            candidates.append((score, n, reason))
-
-    # S01E03 / S1.E3
-    for m in re.finditer(r'(?i)(?:^|[^A-Z0-9])S\s*0*\d{1,2}\s*[._\- ]*E(?:P(?:ISODE)?)?\s*0*(\d{1,4})(?:v\d+)?(?:\b|[^0-9])', stem):
-        add(100, m.group(1), 'SxxEyy')
-
-    # E03 / EP03 / Episode 03
-    for m in re.finditer(r'(?i)(?:^|[^A-Z0-9])E(?:P(?:ISODE)?)?\s*[._\- ]*0*(\d{1,4})(?:v\d+)?(?:\b|[^0-9])', stem):
-        add(97, m.group(1), 'E/EP')
-
-    # Chinese/Japanese episode words.
-    for m in re.finditer(r'(?:第\s*)?(\d{1,4})\s*(?:集|话|話|回)', stem):
-        add(99, m.group(1), '第xx集/话')
-
-    # [03], (03), 【03】. Penalize codec/resolution-like bracket contents.
-    for m in re.finditer(r'[\[\(【]\s*0*(\d{1,4})(?:v\d+)?\s*[\]\)】]', stem):
-        add(88, m.group(1), '[xx]')
-
-    generic_stem = _strip_technical_tokens(stem)
-
-    # Common release naming: " - 03 ", "_03_", ".03."
-    for m in re.finditer(r'(?:^|\s[-–—]\s|[._])0*(\d{1,4})(?:v\d+)?(?=$|[\s._\-\[])', generic_stem):
-        add(82, m.group(1), '分隔数字')
-
-    # Title immediately followed by an episode number, e.g. 未来日记01 / MiraiNikki02.
-    # Restrict this to the end of the stem to avoid treating codec/resolution numbers as episodes.
-    m = re.search(r'(?<!\d)0*(\d{1,4})(?:v\d+)?$', generic_stem)
-    if m and m.start() > 0:
-        add(90, m.group(1), '末尾集数')
-
-    # Standalone 1-3 digit token. Reject likely technical values/year-adjacent values.
-    for m in re.finditer(r'(?<!\d)(\d{1,3})(?!\d)', generic_stem):
-        raw = m.group(1)
-        add(55, raw, '独立数字')
-
-    if not candidates:
-        return Detection(reason='未识别')
-
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    best_score = candidates[0][0]
-    best = [c for c in candidates if c[0] == best_score]
-    # If top-confidence candidates disagree, flag as uncertain rather than guessing.
-    unique_eps = {c[1] for c in best}
-    if len(unique_eps) > 1:
-        return Detection(confidence=25, reason='候选冲突')
-    score, ep, reason = best[0]
-    return Detection(episode=ep, confidence=score, reason=reason)
-
-
-def format_name(template: str, title: str, season: int, episode: Optional[int], special: Optional[str] = None, special_index: Optional[int] = None) -> str:
+    if re.fullmatch(r'\d{1,4}(?:\.\d{1,3})?', stem):
+        return Detection(_number(stem), 100, '纯数字文件名')
+    season = re.search(r'(?i)(?<![A-Z0-9])S(\d{1,2})[ ._-]*E', stem)
+    season_no = int(season[1]) if season else None
+    special = re.search(r'(?i)(?:^|[\s._\-\[（(【])'
+                        r'(NC\s*OP|NC\s*ED|OVA|OAD|SP|SPECIAL|PV)'
+                        r'[ _-]*(\d{1,4})?(?=$|[\s._\-\]）)】])', stem)
     if special:
-        idx = special_index or 1
-        token = special if special in {'NCOP', 'NCED'} else f'{special}{idx:02d}'
-        return f'{title} - {token}'
+        kind = re.sub(r'\s', '', special[1].upper()).replace('SPECIAL', 'SP')
+        return Detection(confidence=98, reason='特别篇', special=kind,
+                         special_index=int(special[2]) if special[2] else None,
+                         season=season_no)
+    cleaned = _clean(stem)
+    if re.search(r'(?i)(?:E|EP|[\s\[])(\d{1,4})\s*[-~&]\s*(?:E)?\d{1,4}', cleaned):
+        return Detection(reason='多集文件，请手动确认', season=season_no)
+    number = r'(\d{1,4}(?:\.\d{1,3})?)'
+    end = r'(?:v\d+)?(?!\d|\.\d)'
+    candidates = []
+    rules = [
+        (100, rf'(?i)(?<![A-Z0-9])S\d{{1,2}}[ ._-]*E\s*{number}{end}', '季集编号'),
+        (97, rf'(?i)(?<![A-Z0-9])E(?:P(?:ISODE)?)?[ ._-]*{number}{end}', '集数标记'),
+        (99, rf'(?:第\s*)?{number}\s*(?:集|话|話|回)', '中文集数'),
+        (88, rf'[\[(【]\s*{number}(?:v\d+)?\s*[\])】]', '括号集数'),
+        (85, rf'(?:^|\s[-–—]\s|[._]){number}{end}(?=$|[\s._\-\[])', '分隔集数'),
+        (80, rf'(?<![\d.]){number}(?:v\d+)?$', '末尾集数'),
+    ]
+    for score, pattern, reason in rules:
+        for match in re.finditer(pattern, cleaned):
+            candidates.append((score, _number(match[1]), reason))
+    if not candidates:
+        for match in re.finditer(r'(?<![\d.])(\d{1,3})(?![\d.])', cleaned):
+            candidates.append((55, int(match[1]), '独立数字，请确认'))
+    if not candidates:
+        return Detection(season=season_no)
+    best = max(c[0] for c in candidates)
+    top = [c for c in candidates if c[0] == best]
+    if len({c[1] for c in top}) != 1:
+        return Detection(confidence=25, reason='多个集数候选，请确认', season=season_no)
+    score, ep, reason = top[0]
+    return Detection(ep, score, reason, season=season_no)
+
+
+class _Episode:
+    def __init__(self, value):
+        self.value = str(value)
+
+    def __format__(self, spec):
+        whole, dot, fraction = self.value.partition('.')
+        return format(int(whole), spec) + (dot + fraction if dot else '')
+
+
+def validate_name(name):
+    if not name or name in {'.', '..'} or re.search(r'[<>:"/\\|?*\x00-\x1f]', name):
+        raise ValueError('文件名为空或包含 Windows 不允许的字符')
+    if name.endswith((' ', '.')) or len(name) > 240:
+        raise ValueError('文件名过长，或以空格／句点结尾')
+    if re.match(r'(?i)^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)', name):
+        raise ValueError('不能使用 Windows 保留文件名')
+    return name
+
+
+def format_name(template, title, season, episode, special=None, special_index=None):
+    if special:
+        token = special + (f'{special_index:02d}' if special_index is not None else '')
+        return validate_name(f'{title} - {token}')
     if episode is None:
-        raise ValueError('episode is required for regular episode')
-
-    # Support {episode:02}, {season:02}, and simple placeholders.
-    values = {'title': title, 'season': season, 'episode': episode}
+        raise ValueError('缺少集数')
     try:
-        return template.format(**values)
-    except Exception:
-        # Safe fallback.
-        return f'{title} - {episode:02d}'
+        result = template.format(title=title, season=season, episode=_Episode(episode))
+    except (KeyError, ValueError, AttributeError, IndexError) as exc:
+        raise ValueError('模板无效，仅支持 title、season、episode 字段') from exc
+    return validate_name(result)
 
 
-def _iter_files(folder: Path, recursive: bool) -> Iterable[Path]:
-    it = folder.rglob('*') if recursive else folder.iterdir()
-    for p in it:
-        if p.is_file() and p.suffix.lower() in MEDIA_EXTS:
-            yield p
+def _signature(path):
+    s = path.stat()
+    return (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns)
 
 
-def build_plan(
-    folder: str,
-    title: str,
-    season: int,
-    template: str,
-    recursive: bool = False,
-    rename_subtitles: bool = True,
-    preserve_language: bool = True,
-    force_sequence: bool = False,
-    sequence_start: int = 1,
-) -> list[RenameItem]:
-    root = Path(folder)
-    files = sorted(_iter_files(root, recursive), key=lambda p: natural_key(str(p.relative_to(root))))
-
-    videos = [p for p in files if p.suffix.lower() in VIDEO_EXTS]
-    forced_map: dict[str, int] = {}
-    if force_sequence:
-        ep = max(1, sequence_start)
-        for p in videos:
-            # Specials keep their special classification and don't consume main episode numbers.
-            det = detect_episode(p.name)
-            if det.special:
+def _iter_files(root, recursive):
+    for directory, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = [d for d in dirs if not (Path(directory) / d).is_symlink()
+                   and not getattr(Path(directory) / d, 'is_junction', lambda: False)()]
+        for name in files:
+            p = Path(directory) / name
+            if name.startswith(('.__anime_renamer_', '.__anime_recovery_')):
                 continue
-            forced_map[str(p)] = ep
-            ep += 1
+            if p.suffix.lower() in VIDEO_EXTS | SUB_EXTS and not p.is_symlink():
+                yield p
+        if not recursive:
+            break
 
-    # Map each video to both its original detected episode and its final episode.
-    # In forced numbering mode subtitles must follow the video's FINAL number,
-    # even when the subtitle itself confidently contains the old episode number.
-    video_assoc: list[tuple[str, Optional[int], int]] = []
-    for p in videos:
-        det = detect_episode(p.name)
-        ep = forced_map.get(str(p), det.episode)
-        if ep is not None:
-            video_assoc.append((p.stem.lower(), det.episode, ep))
 
-    plan: list[RenameItem] = []
-    proposed_targets: dict[str, int] = {}
-
-    for p in files:
-        kind = '视频' if p.suffix.lower() in VIDEO_EXTS else '字幕'
-        if kind == '字幕' and not rename_subtitles:
+def build_plan(folder, title, season, template, recursive=False, rename_subtitles=True,
+               preserve_language=True, force_sequence=False, sequence_start=1,
+               group_settings=None, overrides=None, skipped=None,
+               mode='rename', output_folder=''):
+    root = Path(folder).resolve()
+    if not root.is_dir():
+        raise ValueError('请选择有效的输入文件夹')
+    if mode not in {'rename', 'copy'}:
+        raise ValueError('未知操作模式')
+    if not 1 <= sequence_start <= 9999:
+        raise ValueError('起始集数须在 1–9999 之间')
+    output = Path(output_folder).resolve() if output_folder else None
+    if mode == 'copy' and (output is None or output == root or root in output.parents):
+        raise ValueError('复制目标必须在输入文件夹之外，避免再次导入已整理文件')
+    groups, overrides, skipped = group_settings or {}, overrides or {}, set(skipped or [])
+    paths = sorted(_iter_files(root, recursive), key=lambda p: natural_key(p.relative_to(root)))
+    if not rename_subtitles:
+        paths = [p for p in paths if p.suffix.lower() in VIDEO_EXTS]
+    originals = {p: detect_episode(p.name) for p in paths}
+    detections = {p: replace(originals[p]) for p in paths}
+    for p in paths:
+        if str(p) in overrides:
+            detections[p] = replace(parse_override(overrides[str(p)]), season=originals[p].season)
+    videos = [p for p in paths if p.suffix.lower() in VIDEO_EXTS]
+    associations, ambiguous = {}, set()
+    for p in paths:
+        if p in videos:
             continue
+        local = [v for v in videos if v.parent == p.parent]
+        matches = [v for v in local if p.stem.lower() == v.stem.lower()
+                   or any(p.stem.lower().startswith(v.stem.lower() + sep) for sep in '._-')]
+        if matches:
+            longest = max(len(v.stem) for v in matches)
+            matches = [v for v in matches if len(v.stem) == longest]
+        else:
+            sub = originals[p]
+            matches = [v for v in local if sub.episode is not None
+                       and originals[v].episode == sub.episode
+                       and originals[v].special == sub.special
+                       and (sub.season is None or sub.season == originals[v].season)]
+        if len(matches) == 1:
+            associations[p] = matches[0]
+        elif len(matches) > 1:
+            ambiguous.add(p)
 
-        det = detect_episode(p.name)
-        ep = det.episode
-        special = det.special
-        special_index = det.special_index
+    def group_for(p):
+        det = originals[associations.get(p, p)]
+        relative = p.parent.relative_to(root).as_posix()
+        return f'{relative}|S{det.season if det.season is not None else "unknown"}', relative, det.season
 
-        if force_sequence and kind == '视频' and not special:
-            ep = forced_map.get(str(p))
-            if ep is not None:
-                det = Detection(episode=ep, confidence=100, reason='强制排序编号')
+    counters = {}
+    if force_sequence:
+        for p in videos:
+            det = detections[p]
+            if det.special or str(p) in overrides or str(p) in skipped:
+                continue
+            if isinstance(det.episode, str) or '多集' in det.reason:
+                continue
+            key, _, _ = group_for(p)
+            options = groups.get(key, GroupSettings())
+            ep = counters.get(key, options.start if options.start is not None else sequence_start)
+            if not 1 <= ep <= 9999:
+                raise ValueError('组内集数超出 1–9999 范围')
+            detections[p] = replace(det, episode=ep, confidence=100, reason='组内排序编号')
+            counters[key] = ep + 1
 
-        if kind == '字幕' and not special:
-            low = p.stem.lower()
-
-            # First choice: filename/base-name association. This also handles
-            # language suffixes such as Show.E03.chs.ass.
-            stem_matches = [
-                (base, final_ep)
-                for base, _original_ep, final_ep in video_assoc
-                if low == base
-                or low.startswith(base + '.')
-                or low.startswith(base + '_')
-                or low.startswith(base + '-')
-            ]
-            associated_ep: Optional[int] = None
-            if stem_matches:
-                stem_matches.sort(key=lambda x: len(x[0]), reverse=True)
-                associated_ep = stem_matches[0][1]
-
-            # Second choice: if the subtitle has an episode number, match it to
-            # a UNIQUE video's original episode number. This covers filenames
-            # such as "03.ass" paired with "Show E03.mkv".
-            if associated_ep is None and det.episode is not None:
-                episode_matches = {
-                    final_ep
-                    for _base, original_ep, final_ep in video_assoc
-                    if original_ep == det.episode
-                }
-                if len(episode_matches) == 1:
-                    associated_ep = next(iter(episode_matches))
-
-            # Forced numbering always follows the associated video. In normal
-            # mode, preserve a confident subtitle number and only use association
-            # as a fallback for uncertain/unrecognized subtitles.
-            if associated_ep is not None and (force_sequence or ep is None or det.confidence < 70):
-                ep = associated_ep
-                det = Detection(episode=ep, confidence=95, reason='关联视频')
-
-        if ep is None and not special:
-            plan.append(RenameItem(str(p), str(p), kind, det.reason or '未识别', det.confidence, '未识别，跳过'))
-            continue
-
-        base = format_name(template, title, season, ep, special, special_index)
-        if kind == '字幕' and preserve_language:
-            lang = detect_language_suffix(p.stem)
-            if lang:
-                base += f'.{lang}'
-
-        target = p.with_name(base + p.suffix.lower())
-        status = '可重命名'
-        if target.name == p.name:
-            status = '无需修改'
-
-        key = os.path.normcase(os.path.abspath(str(target)))
-        proposed_targets[key] = proposed_targets.get(key, 0) + 1
-        plan.append(RenameItem(
-            old_path=str(p), new_path=str(target), kind=kind,
-            detected=(special or (f'第 {ep} 集' if ep is not None else det.reason)),
-            confidence=det.confidence, status=status,
-            episode=ep, special=special,
-        ))
-
-    # Second pass: conflicts / existing unrelated targets.
-    old_norm = {os.path.normcase(os.path.abspath(x.old_path)) for x in plan}
+    plan = []
+    for p in paths:
+        key, relative, detected_season = group_for(p)
+        options = groups.get(key, GroupSettings())
+        item_title = options.title.strip() or title.strip()
+        item_season = options.season if options.season is not None else (detected_season if detected_season is not None else season)
+        if not 0 <= item_season <= 99:
+            raise ValueError('季度须在 0–99 之间')
+        det = detections[p]
+        video = associations.get(p)
+        if video and str(p) not in overrides:
+            det = replace(detections[video], reason='跟随同目录视频')
+        label = '当前目录' if relative == '.' else relative
+        if detected_season is not None:
+            label += f' / S{detected_season:02d}'
+        status = READY
+        if str(p) in skipped:
+            status = '已跳过'
+        elif video and str(video) in skipped:
+            status = '已跳过：关联视频已跳过'
+        elif p in ambiguous and str(p) not in overrides:
+            status = '待确认：字幕匹配多个视频'
+        elif force_sequence and p.suffix.lower() in SUB_EXTS and not video and str(p) not in overrides:
+            status = '待确认：未找到对应视频'
+        elif det.episode is None and not det.special:
+            status = '待确认：' + det.reason
+        elif det.confidence < 70:
+            status = '待确认：低置信度'
+        elif not item_title:
+            status = '待填写名称'
+        target = p
+        if status == READY:
+            try:
+                base = format_name(template, item_title, item_season, det.episode,
+                                   det.special, det.special_index)
+                lang = detect_language_suffix(p.stem) if p.suffix.lower() in SUB_EXTS and preserve_language else ''
+                name = validate_name(base + ('.' + lang if lang else '') + p.suffix.lower())
+                target = (output / p.parent.relative_to(root) / name) if mode == 'copy' else p.with_name(name)
+                if target == p and target.name == p.name:
+                    status = '无需修改'
+            except ValueError as exc:
+                status = '错误：' + str(exc)
+        token = (det.special + (str(det.special_index) if det.special_index is not None else '')) if det.special else str(det.episode)
+        plan.append(RenameItem(str(p), str(target), '视频' if p in videos else '字幕',
+                               token if det.episode is not None or det.special else '—',
+                               det.confidence, status, det.episode, det.special, label,
+                               key, det.reason, _signature(p), mode))
+    targets = Counter(os.path.normcase(x.new_path) for x in plan if x.status in {READY, '无需修改'})
+    candidates = {os.path.normcase(x.old_path) for x in plan if x.status == READY}
     for item in plan:
-        if item.status in {'未识别，跳过', '无需修改'}:
+        if item.status != READY:
             continue
-        target_key = os.path.normcase(os.path.abspath(item.new_path))
-        if proposed_targets.get(target_key, 0) > 1:
-            item.status = '冲突：多个文件目标同名'
-            continue
-        target = Path(item.new_path)
-        if target.exists() and target_key not in old_norm:
+        dst = os.path.normcase(item.new_path)
+        if targets[dst] > 1:
+            item.status = '冲突：目标同名'
+        elif Path(item.new_path).exists() and (mode == 'copy' or dst not in candidates):
             item.status = '冲突：目标已存在'
-
+    while True:
+        moving = {os.path.normcase(x.old_path) for x in plan if x.status == READY}
+        blocked = [x for x in plan if x.status == READY and Path(x.new_path).exists()
+                   and os.path.normcase(x.new_path) not in moving]
+        if not blocked:
+            break
+        for item in blocked:
+            item.status = '冲突：目标被未执行文件占用'
     return plan
-
-
-def _history_path() -> Path:
-    base = os.environ.get('LOCALAPPDATA')
-    if base:
-        p = Path(base) / 'AnimeRenamer'
-    else:
-        p = Path.home() / '.anime_renamer'
-    p.mkdir(parents=True, exist_ok=True)
-    return p / 'rename_history.json'
-
-
-def _norm_path(path: str | Path) -> str:
-    return os.path.normcase(os.path.abspath(str(path)))
-
-
-def _transactional_rename(pairs: list[tuple[Path, Path]], temp_prefix: str) -> tuple[bool, str]:
-    """Rename a batch atomically enough for local filesystem use.
-
-    Every source is first moved to a unique temporary path, then every temporary
-    path is moved to its destination. If either phase fails, all files that have
-    moved are staged again and restored to their original source names. The
-    second staging step is important for chains such as A->B, B->C.
-    """
-    records: list[dict] = []
-    try:
-        # Phase 1: vacate every source name so destination chains cannot collide.
-        for src, dst in pairs:
-            tmp = src.with_name(f'{temp_prefix}{uuid.uuid4().hex}{src.suffix}')
-            os.replace(src, tmp)
-            records.append({'src': src, 'dst': dst, 'tmp': tmp, 'location': 'tmp'})
-
-        # Phase 2: publish final names.
-        for rec in records:
-            rec['dst'].parent.mkdir(parents=True, exist_ok=True)
-            os.replace(rec['tmp'], rec['dst'])
-            rec['location'] = 'dst'
-        return True, ''
-
-    except Exception as exc:
-        rollback_errors: list[str] = []
-        staged: list[tuple[dict, Path]] = []
-
-        # Stage every moved file away from both source and destination names.
-        # This prevents a restored B from blocking restoration of A in A->B,B->C.
-        for rec in records:
-            current = rec['dst'] if rec['location'] == 'dst' else rec['tmp']
-            try:
-                if current.exists():
-                    rollback_tmp = current.with_name(
-                        f'.__anime_renamer_rollback_{uuid.uuid4().hex}{current.suffix}'
-                    )
-                    os.replace(current, rollback_tmp)
-                    staged.append((rec, rollback_tmp))
-            except Exception as rb_exc:
-                rollback_errors.append(f'{current}: {rb_exc}')
-
-        # Restore original source names.
-        for rec, rollback_tmp in staged:
-            try:
-                rec['src'].parent.mkdir(parents=True, exist_ok=True)
-                os.replace(rollback_tmp, rec['src'])
-            except Exception as rb_exc:
-                rollback_errors.append(f'{rollback_tmp} -> {rec["src"]}: {rb_exc}')
-
-        if rollback_errors:
-            return False, f'{exc}；回滚仍有异常：' + ' | '.join(rollback_errors)
-        return False, str(exc)
-
-
-def execute_plan(plan: list[RenameItem]) -> dict:
-    actionable = [x for x in plan if x.status == '可重命名']
-    if not actionable:
-        return {'ok': False, 'message': '没有可执行的重命名项目。', 'count': 0}
-
-    # Recheck conflicts immediately before modifying anything.
-    old_set = {_norm_path(x.old_path) for x in actionable}
-    target_set: set[str] = set()
-    for x in actionable:
-        t = _norm_path(x.new_path)
-        if t in target_set:
-            return {'ok': False, 'message': f'目标文件名冲突：{x.new_path}', 'count': 0}
-        target_set.add(t)
-        if Path(x.new_path).exists() and t not in old_set:
-            return {'ok': False, 'message': f'目标文件已存在：{x.new_path}', 'count': 0}
-
-    pairs = [(Path(x.old_path), Path(x.new_path)) for x in actionable]
-    ok, error = _transactional_rename(pairs, '.__anime_renamer_')
-    if not ok:
-        return {'ok': False, 'message': f'重命名失败，已回滚：{error}', 'count': 0}
-
-    completed = [{'old_path': x.old_path, 'new_path': x.new_path} for x in actionable]
-
-    history = {
-        'version': 1,
-        'operation_id': uuid.uuid4().hex,
-        'items': completed,
-    }
-    _history_path().write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding='utf-8')
-    return {'ok': True, 'message': f'已重命名 {len(completed)} 个文件。', 'count': len(completed)}
-
-
-def undo_last() -> dict:
-    hp = _history_path()
-    if not hp.exists():
-        return {'ok': False, 'message': '没有找到可撤销的历史记录。', 'count': 0}
-    try:
-        history = json.loads(hp.read_text(encoding='utf-8'))
-        items = history.get('items', [])
-    except Exception as e:
-        return {'ok': False, 'message': f'历史记录读取失败：{e}', 'count': 0}
-
-    if not items:
-        return {'ok': False, 'message': '历史记录为空。', 'count': 0}
-
-    # Validate first. An old name occupied by another CURRENT file from this same
-    # batch is legal (e.g. original A->B, B->C leaves B and C before undo).
-    current_new_set = {_norm_path(rec['new_path']) for rec in items}
-    for rec in items:
-        oldp = Path(rec['old_path'])
-        newp = Path(rec['new_path'])
-        if not newp.exists():
-            return {'ok': False, 'message': f'无法撤销：当前文件不存在：{newp}', 'count': 0}
-        if oldp.exists() and _norm_path(oldp) not in current_new_set:
-            return {'ok': False, 'message': f'无法撤销：原文件名已被占用：{oldp}', 'count': 0}
-
-    pairs = [(Path(rec['new_path']), Path(rec['old_path'])) for rec in items]
-    ok, error = _transactional_rename(pairs, '.__anime_renamer_undo_')
-    if not ok:
-        return {'ok': False, 'message': f'撤销失败，已恢复到撤销前状态：{error}', 'count': 0}
-
-    hp.unlink(missing_ok=True)
-    return {'ok': True, 'message': f'已撤销上一次操作，共恢复 {len(items)} 个文件。', 'count': len(items)}
