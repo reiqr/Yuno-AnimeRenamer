@@ -7,24 +7,39 @@ set "PY=python"
 where python >nul 2>nul
 if errorlevel 1 set "PY=py -3"
 
-rem Always build from a clean directory so an old spec/resource cannot keep the old icon.
+rem Only clear generated build cache/spec files. Never delete the whole dist directory.
 if exist build rmdir /s /q build
-if exist dist rmdir /s /q dist
 if exist AnimeRenamer.spec del /q AnimeRenamer.spec
 if exist AnimeRenamer_FutureDiary.spec del /q AnimeRenamer_FutureDiary.spec
 
 %PY% -m PyInstaller --version >nul 2>nul
 if errorlevel 1 (
-  echo PyInstaller is not installed. Installing it now...
-  %PY% -m pip install pyinstaller
-  if errorlevel 1 goto :fail
+  echo.
+  echo PyInstaller is required but is not installed.
+  echo This script will NOT install or upgrade packages automatically.
+  echo.
+  echo Dependency : PyInstaller
+  echo Source     : Python Package Index ^(PyPI^) / https://pypi.org/project/pyinstaller/
+  echo Purpose    : Package AnimeRenamer.pyw as a Windows executable.
+  echo Risk       : Installing a Python package changes the selected Python environment and may pull transitive dependencies.
+  echo.
+  echo If you have reviewed and approved the dependency, install it manually with:
+  echo   %PY% -m pip install pyinstaller
+  echo Then run build_exe.bat again.
+  echo.
+  goto :fail
 )
+
+if not exist dist mkdir dist
+rem Remove only this build target so unrelated release ZIPs/files in dist are preserved.
+if exist "dist\AnimeRenamer_FutureDiary.exe" del /q "dist\AnimeRenamer_FutureDiary.exe"
 
 %PY% -m PyInstaller --noconfirm --clean --onefile --windowed --noupx ^
   --name AnimeRenamer_FutureDiary ^
   --version-file "%CD%\windows_version_info.txt" ^
   --icon "%CD%\assets\app_icon.ico" ^
   --add-data "%CD%\assets;assets" ^
+  --distpath "%CD%\dist" ^
   AnimeRenamer.pyw
 
 if errorlevel 1 goto :fail
@@ -33,8 +48,7 @@ echo.
 echo Build complete:
 echo   dist\AnimeRenamer_FutureDiary.exe
 echo.
-echo A new executable name is used intentionally so Windows Explorer does not reuse
-echo the cached icon from an older AnimeRenamer.exe.
+echo Existing unrelated files in dist were preserved.
 echo If Explorer still shows an old icon, run refresh_icon_cache.bat once.
 echo.
 pause
@@ -42,7 +56,7 @@ exit /b 0
 
 :fail
 echo.
-echo Build failed.
+echo Build stopped without changing unrelated dist files.
 echo.
 pause
 exit /b 1
