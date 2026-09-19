@@ -1,0 +1,164 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.232074069 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.230910293 +0000
+@@ -199,16 +199,16 @@
+         if getattr(self, 'banner_photo', None):
+             canvas.create_image(0, 0, image=self.banner_photo, anchor='nw', tags='overlay')
+         # Dark veil on the right keeps text readable without altering the asset.
+-        canvas.create_rectangle(max(380, int(width * 0.46)), 0, width, 112,
++        canvas.create_rectangle(max(360, int(width * 0.44)), 0, width, 106,
+                                 fill='#0D0910', stipple='gray50', outline='', tags='overlay')
+         tx = max(470, int(width * 0.58))
+-        canvas.create_text(tx, 26, text='ANIME RENAMER', anchor='w', fill='#FFF2F7',
++        canvas.create_text(tx, 24, text='ANIME RENAMER', anchor='w', fill='#FFF2F7',
+                            font=(self.FONTS['latin'], 19, 'bold'), tags='overlay')
+-        canvas.create_text(tx, 54, text='未来日记 · RENAME TERMINAL', anchor='w', fill='#FF6EA3',
++        canvas.create_text(tx, 51, text='未来日记 · RENAME TERMINAL', anchor='w', fill='#FF6EA3',
+                            font=(self.FONTS['body'], 10, 'bold'), tags='overlay')
+-        canvas.create_text(tx, 78, text='扫描  /  校对  /  预览  /  改写未来', anchor='w', fill='#C9BCC5',
++        canvas.create_text(tx, 75, text='扫描  /  校对  /  预览  /  改写未来', anchor='w', fill='#C9BCC5',
+                            font=(self.FONTS['body'], 9), tags='overlay')
+-        canvas.create_line(tx, 96, min(width - 24, tx + 300), 96,
++        canvas.create_line(tx, 92, min(width - 24, tx + 300), 92,
+                            fill='#6E294A', width=1, tags='overlay')
+@@ -300,10 +300,13 @@
+             bg = c['pink2'] if primary else ('#3A1820' if danger else c['panel3'])
+             fg = '#FFFFFF' if primary else ('#FF9BA7' if danger else c['text'])
+             active = c['pink'] if primary else ('#52202B' if danger else '#332536')
+-            return tk.Button(actions, text=text, command=command, bg=bg, fg=fg,
+-                             activebackground=active, activeforeground='#FFFFFF',
+-                             relief='flat', bd=0, padx=16, pady=8,
+-                             cursor='hand2', font=(self.FONTS['body'], 9, 'bold'))
++            button = tk.Button(actions, text=text, command=command, bg=bg, fg=fg,
++                               activebackground=active, activeforeground='#FFFFFF',
++                               relief='flat', bd=0, padx=16, pady=8,
++                               cursor='hand2', font=(self.FONTS['body'], 9, 'bold'))
++            button.bind('<Enter>', lambda _e, b=button, col=active: b.configure(bg=col))
++            button.bind('<Leave>', lambda _e, b=button, col=bg: b.configure(bg=col))
++            return button
+@@ -404,6 +407,7 @@
+         style.configure('App.TFrame', background=c['bg'])
+         style.configure('Panel.TFrame', background=c['panel'])
+         style.configure('Card.TFrame', background=c['panel2'])
++        style.configure('Toolbar.TFrame', background='#17131B')
+         style.configure('Sidebar.TFrame', background='#110C14')
+@@ -438,6 +442,23 @@
+         style.configure('TSpinbox', padding=8, arrowsize=11, relief='flat', borderwidth=1,
+                         foreground=c['text'], fieldbackground=c['panel3'],
+                         arrowcolor=c['pink'])
++        style.map('TEntry', bordercolor=[('focus', c['pink']), ('!focus', '#4A3341')],
++                  lightcolor=[('focus', c['pink']), ('!focus', '#4A3341')],
++                  darkcolor=[('focus', c['pink']), ('!focus', '#4A3341')])
++        style.map('TCombobox', bordercolor=[('focus', c['pink']), ('active', '#77405C'), ('!focus', '#4A3341')],
++                  lightcolor=[('focus', c['pink']), ('!focus', '#4A3341')],
++                  darkcolor=[('focus', c['pink']), ('!focus', '#4A3341')],
++                  arrowcolor=[('active', '#FFFFFF'), ('readonly', c['pink'])])
++        style.map('TSpinbox', bordercolor=[('focus', c['cyan']), ('active', '#356C6C'), ('!focus', '#4A3341')],
++                  lightcolor=[('focus', c['cyan']), ('!focus', '#4A3341')],
++                  darkcolor=[('focus', c['cyan']), ('!focus', '#4A3341')],
++                  arrowcolor=[('active', '#FFFFFF'), ('!active', c['cyan'])])
++        style.configure('Option.TCheckbutton', background=c['panel'], foreground='#DCCFD8', padding=(2, 2))
++        style.map('Option.TCheckbutton', background=[('active', c['panel'])],
++                  foreground=[('active', '#FFFFFF'), ('selected', '#FFF0F6')],
++                  indicatorcolor=[('selected', c['pink2']), ('!selected', '#493943')])
+@@ -469,13 +490,19 @@
+                         relief='flat', borderwidth=0, padding=(10, 9), font=(self.FONTS['body'], 9, 'bold'))
+         style.map('Treeview', background=[('selected', '#4A1F39')], foreground=[('selected', '#FFFFFF')])
+         style.map('Treeview.Heading', background=[('active', '#38243A')], foreground=[('active', '#FFFFFF')])
+-        style.configure('Vertical.TScrollbar', background='#251B28', troughcolor='#121017', arrowcolor='#998793')
+-        style.configure('Horizontal.TScrollbar', background='#251B28', troughcolor='#121017', arrowcolor='#998793')
++        style.configure('Vertical.TScrollbar', background='#251B28', troughcolor='#0F0D12', arrowcolor='#B89EAE',
++                        bordercolor='#0F0D12', lightcolor='#251B28', darkcolor='#251B28', arrowsize=9, width=10)
++        style.map('Vertical.TScrollbar', background=[('active', c['pink2']), ('pressed', c['pink'])],
++                  arrowcolor=[('active', '#FFFFFF')])
++        style.configure('Horizontal.TScrollbar', background='#251B28', troughcolor='#0F0D12', arrowcolor='#B89EAE',
++                        bordercolor='#0F0D12', lightcolor='#251B28', darkcolor='#251B28', arrowsize=9, width=10)
++        style.map('Horizontal.TScrollbar', background=[('active', c['pink2']), ('pressed', c['pink'])],
++                  arrowcolor=[('active', '#FFFFFF')])
+@@ -483,7 +510,7 @@
+         shell = ttk.Frame(self, style='App.TFrame')
+         shell.pack(fill='both', expand=True)
+-        sidebar = ttk.Frame(shell, style='Sidebar.TFrame', width=252)
++        sidebar = ttk.Frame(shell, style='Sidebar.TFrame', width=236)
+@@ -487,15 +514,15 @@
+             tk.Label(sidebar, image=self.sidebar_photo, bg='#110C14', bd=0,
+                      highlightthickness=0).pack(fill='x')
+         else:
+-            fallback = tk.Canvas(sidebar, width=252, height=350, bg='#110C14', highlightthickness=0)
++            fallback = tk.Canvas(sidebar, width=236, height=330, bg='#110C14', highlightthickness=0)
+             fallback.pack(fill='x')
+-            fallback.create_oval(35, 34, 217, 216, fill='#321326', outline='#74244D', width=2)
+-            fallback.create_text(126, 172, text='MIRAI NIKKI', fill='#FF6EA3',
++            fallback.create_oval(32, 34, 204, 206, fill='#321326', outline='#74244D', width=2)
++            fallback.create_text(118, 164, text='MIRAI NIKKI', fill='#FF6EA3',
+                                  font=(self.FONTS['display'], 16, 'bold'))
+-            fallback.create_text(126, 204, text='theme asset missing', fill='#927B8A',
++            fallback.create_text(118, 194, text='theme asset missing', fill='#927B8A',
+                                  font=(self.FONTS['mono'], 8))
+-        side_text = ttk.Frame(sidebar, style='Sidebar.TFrame', padding=(20, 9, 18, 16))
++        side_text = ttk.Frame(sidebar, style='Sidebar.TFrame', padding=(17, 9, 16, 15))
+@@ -523,7 +550,7 @@
+         self.banner_photo = self._load_photo('yuno_banner.png')
+-        self.banner_canvas = tk.Canvas(main, height=112, bg='#140C13', bd=0,
++        self.banner_canvas = tk.Canvas(main, height=106, bg='#140C13', bd=0,
+@@ -580,19 +607,19 @@
+         for text, variable in [('包含子文件夹', self.recursive_var), ('联动字幕', self.sub_var),
+                                ('保留字幕语言', self.lang_var), ('每组全部正片按排序编号', self.force_var)]:
+-            ttk.Checkbutton(opts, text=text, variable=variable).pack(side='left', padx=(0, 14))
++            ttk.Checkbutton(opts, text=text, variable=variable, style='Option.TCheckbutton').pack(side='left', padx=(0, 14))
+@@ -601,11 +628,11 @@
+-        toolbar = ttk.Frame(main, style='Panel.TFrame', padding=(10, 8))
++        toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(10, 8))
+         toolbar.pack(fill='x', pady=(10, 8))
+-        ttk.Button(toolbar, text='设置所选分组', command=self.edit_group, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='纠正集数 / 特别篇', command=self.edit_item, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='跳过 / 恢复', command=self.toggle_skip, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='清除纠正', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='GROUP · 分组设置', command=self.edit_group, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='EDIT · 纠正集数', command=self.edit_item, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='SKIP · 跳过/恢复', command=self.toggle_skip, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='RESET · 清除纠正', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+@@ -601,7 +628,7 @@
+         ttk.Label(preview_head, text='02  未来记录 / RENAME PREVIEW', style='Section.TLabel').pack(side='left')
+-        ttk.Label(preview_head, text='绿色 = 可执行    橙色 = 待确认    红色 = 冲突', style='MutedPanel.TLabel').pack(side='right')
++        ttk.Label(preview_head, text='CYAN 可执行   ·   AMBER 待确认   ·   RED 冲突   ·   GRAY 跳过', style='MutedPanel.TLabel').pack(side='right')
+@@ -630,6 +657,28 @@
+         self.tree.bind('<space>', lambda e: self.toggle_skip())
+         self.tree.bind('<<TreeviewSelect>>', self.show_detail)
++        self.empty_state = tk.Frame(preview, bg='#121017', bd=0)
++        self.empty_state.place(relx=0.5, rely=0.5, anchor='center', width=390, height=170)
++        empty_canvas = tk.Canvas(self.empty_state, width=92, height=128, bg='#121017', highlightthickness=0, bd=0)
++        empty_canvas.pack(side='left', padx=(12, 18), pady=18)
++        empty_canvas.create_rectangle(18, 7, 75, 116, outline='#5A3146', width=2)
++        empty_canvas.create_rectangle(25, 19, 68, 83, outline='#2D6B6B', fill='#15141A', width=1)
++        empty_canvas.create_text(46, 49, text='♥', fill=c['pink'], font=(self.FONTS['body'], 22, 'bold'))
++        empty_canvas.create_line(31, 94, 61, 94, fill='#38D6D0', width=2)
++        empty_canvas.create_oval(42, 103, 50, 111, outline='#8F7183', width=1)
++        empty_text = tk.Frame(self.empty_state, bg='#121017')
++        empty_text.pack(side='left', fill='both', expand=True, pady=30)
++        self.empty_title_var = tk.StringVar(value='尚未读取未来')
++        self.empty_sub_var = tk.StringVar(value='选择文件夹并扫描后，重命名预览会显示在这里。')
++        tk.Label(empty_text, textvariable=self.empty_title_var, bg='#121017', fg='#F7EAF3', font=(self.FONTS['display'], 13, 'bold'), anchor='w').pack(fill='x')
++        tk.Label(empty_text, text='WAITING FOR DIARY DATA', bg='#121017', fg=c['cyan'], font=(self.FONTS['mono'], 8, 'bold'), anchor='w').pack(fill='x', pady=(3, 8))
++        tk.Label(empty_text, textvariable=self.empty_sub_var, bg='#121017', fg='#9F929B', wraplength=245, justify='left', anchor='w', font=(self.FONTS['body'], 9)).pack(fill='x')
+@@ -655,6 +704,19 @@
++    def _set_empty_state(self, title=None, subtitle=None, visible=True):
++        if not hasattr(self, 'empty_state'):
++            return
++        if title is not None:
++            self.empty_title_var.set(title)
++        if subtitle is not None:
++            self.empty_sub_var.set(subtitle)
++        if visible:
++            self.empty_state.place(relx=0.5, rely=0.5, anchor='center', width=390, height=170)
++            self.empty_state.lift()
++        else:
++            self.empty_state.place_forget()
+@@ -753,6 +815,7 @@
+         self.status_var.set('正在识别文件…')
++        self._set_empty_state('正在读取未来…', '正在分析文件名、字幕关联和分组，请稍候。', visible=True)
+@@ -784,6 +847,10 @@
+         self.status_var.set(f'{len(nodes)} 组 · {len(plan)} 个文件 · 可执行 {ready} · 待确认/填写 {review} · 已跳过 {sum(x.status == "已跳过" for x in plan)}')
++        if plan:
++            self._set_empty_state(visible=False)
++        else:
++            self._set_empty_state('没有发现可处理文件', '可以检查文件夹、子目录选项，或确认文件扩展名是否受支持。', visible=True)
