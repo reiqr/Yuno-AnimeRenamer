@@ -61,6 +61,11 @@ class ThemeDialogTests(unittest.TestCase):
         self.app.after(50, fill_and_return)
         self.assertEqual(self.app._prompt('输入', 'Enter 确认：'), 'SP01')
 
+    def test_template_change_uses_shared_templates(self):
+        self.app.template_name_var.set('番剧名 S01E01')
+        self.app.on_template_change()
+        self.assertEqual(self.app.template_var.get(), '{title} S{season:02d}E{episode:02d}')
+
 
 if __name__ == '__main__':
     unittest.main()
