@@ -28,17 +28,36 @@ class GroupDialog(simpledialog.Dialog):
         super().__init__(parent, '设置分组：' + label)
 
     def body(self, master):
-        ttk.Label(master, text='留空则使用上方的默认设置。').grid(row=0, columnspan=2, pady=8)
+        # Match the main Future Diary theme instead of falling back to classic Tk styling.
+        colors = getattr(self.parent, 'COLORS', {})
+        self.configure(bg=colors.get('bg', '#0D0B11'))
+        master.configure(bg=colors.get('panel', '#141119'))
+        ttk.Label(master, text='GROUP SETTINGS  /  分组规则', style='Section.TLabel').grid(
+            row=0, column=0, columnspan=2, sticky='w', padx=12, pady=(12, 2))
+        ttk.Label(master, text='留空则使用主界面的默认设置。', style='MutedPanel.TLabel').grid(
+            row=1, column=0, columnspan=2, sticky='w', padx=12, pady=(0, 10))
         self.fields = []
         for row, (label, value) in enumerate([
             ('作品名称', self.settings.title), ('季度（0–99）', self.settings.season),
-            ('排序起始集（1–9999）', self.settings.start)], 1):
-            ttk.Label(master, text=label).grid(row=row, column=0, sticky='w', padx=8, pady=5)
+            ('排序起始集（1–9999）', self.settings.start)], 2):
+            ttk.Label(master, text=label, style='MutedPanel.TLabel').grid(
+                row=row, column=0, sticky='w', padx=(12, 10), pady=6)
             entry = ttk.Entry(master, width=32)
             entry.insert(0, '' if value is None else str(value))
-            entry.grid(row=row, column=1, padx=8, pady=5)
+            entry.grid(row=row, column=1, sticky='ew', padx=(0, 12), pady=6)
             self.fields.append(entry)
+        master.columnconfigure(1, weight=1)
         return self.fields[0]
+
+    def buttonbox(self):
+        box = ttk.Frame(self, style='Panel.TFrame', padding=(12, 10))
+        ttk.Button(box, text='保存设置', width=12, command=self.ok,
+                   style='Primary.TButton', default='active').pack(side='right', padx=(8, 0))
+        ttk.Button(box, text='取消', width=10, command=self.cancel,
+                   style='Ghost.TButton').pack(side='right')
+        self.bind('<Return>', self.ok)
+        self.bind('<Escape>', self.cancel)
+        box.pack(fill='x')
 
     def validate(self):
         title, season, start = [x.get().strip() for x in self.fields]
@@ -60,8 +79,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f'AnimeRenamer {VERSION} · 未来日记主题')
-        self.geometry('1380x860')
-        self.minsize(1120, 720)
+        self._set_initial_geometry()
         self.plan = []
         self.overrides, self.groups, self.skipped = {}, {}, set()
         self.busy, self.dirty = False, True
@@ -76,6 +94,20 @@ class App(tk.Tk):
             pass
         self.protocol('WM_DELETE_WINDOW', self.close)
         self.after(150, self.check_recovery)
+
+    def _set_initial_geometry(self):
+        """Open at a compact, centered size that adapts to the current monitor."""
+        self.update_idletasks()
+        sw = max(1024, self.winfo_screenwidth())
+        sh = max(720, self.winfo_screenheight())
+        width = min(1240, max(1020, int(sw * 0.72)))
+        height = min(760, max(640, int(sh * 0.72)))
+        width = min(width, max(980, sw - 70))
+        height = min(height, max(610, sh - 90))
+        x = max(0, (sw - width) // 2)
+        y = max(0, (sh - height) // 2 - 12)
+        self.geometry(f'{width}x{height}+{x}+{y}')
+        self.minsize(980, 610)
 
     def _pick_font(self, *preferred):
         """Return the first installed font family, with a safe Tk fallback."""
@@ -127,16 +159,16 @@ class App(tk.Tk):
         if getattr(self, 'banner_photo', None):
             canvas.create_image(0, 0, image=self.banner_photo, anchor='nw', tags='overlay')
         # Dark veil on the right keeps text readable without altering the asset.
-        canvas.create_rectangle(max(420, int(width * 0.48)), 0, width, 132,
+        canvas.create_rectangle(max(380, int(width * 0.46)), 0, width, 112,
                                 fill='#0D0910', stipple='gray50', outline='', tags='overlay')
-        tx = max(535, int(width * 0.61))
-        canvas.create_text(tx, 32, text='ANIME RENAMER', anchor='w', fill='#FFF2F7',
-                           font=(self.FONTS['display'], 21, 'bold'), tags='overlay')
-        canvas.create_text(tx, 65, text='未来日记 · RENAME TERMINAL', anchor='w', fill='#FF6EA3',
+        tx = max(470, int(width * 0.58))
+        canvas.create_text(tx, 26, text='ANIME RENAMER', anchor='w', fill='#FFF2F7',
+                           font=(self.FONTS['latin'], 19, 'bold'), tags='overlay')
+        canvas.create_text(tx, 54, text='未来日记 · RENAME TERMINAL', anchor='w', fill='#FF6EA3',
                            font=(self.FONTS['body'], 10, 'bold'), tags='overlay')
-        canvas.create_text(tx, 93, text='扫描  /  校对  /  预览  /  改写未来', anchor='w', fill='#C9BCC5',
+        canvas.create_text(tx, 78, text='扫描  /  校对  /  预览  /  改写未来', anchor='w', fill='#C9BCC5',
                            font=(self.FONTS['body'], 9), tags='overlay')
-        canvas.create_line(tx, 111, min(width - 28, tx + 330), 111,
+        canvas.create_line(tx, 96, min(width - 24, tx + 300), 96,
                            fill='#6E294A', width=1, tags='overlay')
 
     def _build_ui(self):
@@ -164,11 +196,12 @@ class App(tk.Tk):
         self._theme_images = []
         self.FONTS = {
             'body': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'PingFang SC', 'Segoe UI'),
-            'display': self._pick_font('Segoe UI Variable Display', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Segoe UI'),
+            'display': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'Segoe UI'),
+            'latin': self._pick_font('Segoe UI Variable Display', 'Segoe UI Semibold', 'Segoe UI', 'Arial'),
             'jp': self._pick_font('Yu Gothic UI', 'Yu Gothic', 'Meiryo UI', 'Noto Sans CJK JP', 'Noto Sans JP', 'Microsoft YaHei UI'),
             'mono': self._pick_font('Cascadia Mono', 'JetBrains Mono', 'Consolas', 'DejaVu Sans Mono'),
         }
-        self.option_add('*Font', (self.FONTS['body'], 10))
+        self.option_add('*Font', (self.FONTS['body'], 9))
 
         style = ttk.Style(self)
         if 'clam' in style.theme_names():
@@ -192,7 +225,7 @@ class App(tk.Tk):
         style.configure('Sidebar.TLabel', background='#110C14', foreground=c['text'])
         style.configure('SidebarMuted.TLabel', background='#110C14', foreground='#A98E9E')
         style.configure('Hero.TLabel', background='#110C14', foreground='#FFF1F7',
-                        font=(self.FONTS['display'], 20, 'bold'))
+                        font=(self.FONTS['display'], 18, 'bold'))
         style.configure('HeroSub.TLabel', background='#110C14', foreground=c['pink'],
                         font=(self.FONTS['mono'], 8, 'bold'))
         style.configure('Title.TLabel', background=c['bg'], foreground=c['text'],
@@ -234,7 +267,7 @@ class App(tk.Tk):
         style.configure('Cyan.TButton', background='#143638', foreground='#74FFF3', bordercolor='#246B6A')
         style.map('Cyan.TButton', background=[('active', '#1B4A4A')])
 
-        style.configure('Treeview', rowheight=32, relief='flat', borderwidth=0,
+        style.configure('Treeview', rowheight=28, relief='flat', borderwidth=0,
                         background='#121017', fieldbackground='#121017', foreground='#EDE5EC',
                         font=(self.FONTS['body'], 9))
         style.configure('Treeview.Heading', background='#211923', foreground='#EADCE7',
@@ -247,10 +280,10 @@ class App(tk.Tk):
         # Main composition: image-backed themed sidebar + working area.
         shell = ttk.Frame(self, style='App.TFrame')
         shell.pack(fill='both', expand=True)
-        sidebar = ttk.Frame(shell, style='Sidebar.TFrame', width=280)
+        sidebar = ttk.Frame(shell, style='Sidebar.TFrame', width=252)
         sidebar.pack(side='left', fill='y')
         sidebar.pack_propagate(False)
-        main = ttk.Frame(shell, style='App.TFrame', padding=(18, 14, 18, 14))
+        main = ttk.Frame(shell, style='App.TFrame', padding=(14, 10, 14, 10))
         main.pack(side='left', fill='both', expand=True)
 
         # Sidebar uses an optimized local PNG generated for this theme.
@@ -259,12 +292,12 @@ class App(tk.Tk):
             tk.Label(sidebar, image=self.sidebar_photo, bg='#110C14', bd=0,
                      highlightthickness=0).pack(fill='x')
         else:
-            fallback = tk.Canvas(sidebar, width=280, height=390, bg='#110C14', highlightthickness=0)
+            fallback = tk.Canvas(sidebar, width=252, height=350, bg='#110C14', highlightthickness=0)
             fallback.pack(fill='x')
-            fallback.create_oval(45, 42, 235, 230, fill='#321326', outline='#74244D', width=2)
-            fallback.create_text(140, 182, text='MIRAI NIKKI', fill='#FF6EA3',
+            fallback.create_oval(35, 34, 217, 216, fill='#321326', outline='#74244D', width=2)
+            fallback.create_text(126, 172, text='MIRAI NIKKI', fill='#FF6EA3',
                                  font=(self.FONTS['display'], 16, 'bold'))
-            fallback.create_text(140, 214, text='theme asset missing', fill='#927B8A',
+            fallback.create_text(126, 204, text='theme asset missing', fill='#927B8A',
                                  font=(self.FONTS['mono'], 8))
 
         side_text = ttk.Frame(sidebar, style='Sidebar.TFrame', padding=(20, 9, 18, 16))
@@ -284,14 +317,14 @@ class App(tk.Tk):
 
         # Image-backed top banner. Text is rendered by Tk to keep Chinese/Japanese crisp.
         self.banner_photo = self._load_photo('yuno_banner.png')
-        self.banner_canvas = tk.Canvas(main, height=132, bg='#140C13', bd=0,
+        self.banner_canvas = tk.Canvas(main, height=112, bg='#140C13', bd=0,
                                        highlightthickness=0, relief='flat')
         self.banner_canvas.pack(fill='x', pady=(0, 11))
         self.banner_canvas.bind('<Configure>', self._draw_banner)
         self.after_idle(self._draw_banner)
 
         # Form card
-        form_card = ttk.Frame(main, style='Panel.TFrame', padding=(14, 12))
+        form_card = ttk.Frame(main, style='Panel.TFrame', padding=(12, 9))
         form_card.pack(fill='x')
         ttk.Label(form_card, text='01  日记源 / FILE SOURCE', style='Section.TLabel').grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 8))
         self.folder_var = tk.StringVar()
@@ -357,7 +390,7 @@ class App(tk.Tk):
         ttk.Label(toolbar, text='双击文件纠正 · 空格切换跳过', style='Muted.TLabel').pack(side='right')
 
         # Preview card
-        preview_card = ttk.Frame(main, style='Panel.TFrame', padding=(10, 10))
+        preview_card = ttk.Frame(main, style='Panel.TFrame', padding=(8, 8))
         preview_card.pack(fill='both', expand=True)
         preview_head = ttk.Frame(preview_card, style='Panel.TFrame')
         preview_head.pack(fill='x', pady=(0, 7))
@@ -396,18 +429,20 @@ class App(tk.Tk):
         detail_card.pack(fill='x', pady=(8, 0))
         self.detail_var = tk.StringVar(value='待确认的文件不会执行。若识别不正确，请双击对应文件进行纠正。')
         ttk.Label(detail_card, text='DIARY LOG', style='Cyan.TLabel').pack(anchor='w')
-        ttk.Label(detail_card, textvariable=self.detail_var, style='Card.TLabel', wraplength=1000).pack(fill='x', pady=(2, 0))
+        ttk.Label(detail_card, textvariable=self.detail_var, style='Card.TLabel', wraplength=780).pack(fill='x', pady=(2, 0))
 
         footer = ttk.Frame(main, style='App.TFrame')
         footer.pack(fill='x', pady=(9, 0))
         left_footer = ttk.Frame(footer, style='App.TFrame')
         left_footer.pack(side='left', fill='x', expand=True)
         self.status_var = tk.StringVar(value='选择文件夹，填写作品名，然后扫描未来记录。')
-        ttk.Label(left_footer, textvariable=self.status_var, style='Muted.TLabel', wraplength=700).pack(anchor='w')
+        ttk.Label(left_footer, textvariable=self.status_var, style='Muted.TLabel', wraplength=560).pack(anchor='w')
         ttk.Button(footer, text='恢复中断操作', command=self.recover, style='Ghost.TButton').pack(side='left', padx=(8, 0))
         ttk.Button(footer, text='撤销上次操作', command=self.undo, style='Danger.TButton').pack(side='left', padx=8)
         self.run_btn = ttk.Button(footer, text='改写未来 · 执行', command=self.execute, state='disabled', style='Primary.TButton')
         self.run_btn.pack(side='right')
+        ttk.Label(footer, text='PREVIEW SAFE', foreground=c['cyan'], background=c['bg'],
+                  font=(self.FONTS['mono'], 8, 'bold')).pack(side='right', padx=(0, 10))
 
         for variable in [self.folder_var, self.title_var, self.season_var, self.template_var,
                          self.mode_var, self.output_var, self.recursive_var, self.sub_var,
