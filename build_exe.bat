@@ -39,7 +39,14 @@ if errorlevel 1 goto :fail
 
 if not exist dist mkdir dist
 rem Remove only this build target so unrelated release ZIPs/files in dist are preserved.
-if exist "dist\AnimeRenamer_FutureDiary.exe" del /q "dist\AnimeRenamer_FutureDiary.exe"
+rem Retry a few times for short-lived Explorer/antivirus locks, but never kill processes automatically.
+for /l %%R in (1,1,3) do (
+  if exist "dist\AnimeRenamer_FutureDiary.exe" (
+    del /f /q "dist\AnimeRenamer_FutureDiary.exe" >nul 2>nul
+    if exist "dist\AnimeRenamer_FutureDiary.exe" timeout /t 1 /nobreak >nul
+  )
+)
+if exist "dist\AnimeRenamer_FutureDiary.exe" goto :locked_exe
 
 %PY% -m PyInstaller --noconfirm --clean --onefile --windowed --noupx ^
   --name AnimeRenamer_FutureDiary ^
@@ -62,6 +69,19 @@ echo If Explorer still shows an old icon or version, run tools\refresh_icon_cach
 echo.
 pause
 exit /b 0
+
+:locked_exe
+echo.
+echo Cannot replace dist\AnimeRenamer_FutureDiary.exe because Windows is still using it.
+echo Close AnimeRenamer_FutureDiary.exe first. If it is already closed, also close
+echo Explorer Preview/Details panes for this EXE and wait for antivirus scanning to finish.
+echo.
+echo Running process check:
+tasklist /fi "IMAGENAME eq AnimeRenamer_FutureDiary.exe" 2^>nul | findstr /i "AnimeRenamer_FutureDiary.exe"
+echo.
+echo No process listed above usually means Explorer or antivirus still holds the file briefly.
+echo Run build_exe.bat again after the lock is released.
+goto :fail
 
 :fail
 echo.

@@ -26,23 +26,28 @@ class ThemeToggle(tk.Checkbutton):
 
     def _selected(self):
         try:
-            return bool(self.cget('variable') and self.getvar(self.cget('variable')))
-        except tk.TclError:
+            variable = self.cget('variable')
+            if not variable:
+                return False
+            return bool(self.tk.getboolean(self.getvar(variable)))
+        except (tk.TclError, ValueError):
             return False
 
     def _sync_visual(self, *_):
         if str(self.cget('state')) == 'disabled':
             return
         selected = self._selected()
+        bg = self._colors['on_bg'] if selected else self._colors['off_bg']
         self.configure(
-            bg=self._colors['on_bg'] if selected else self._colors['off_bg'],
+            bg=bg,
+            selectcolor=bg,
             fg=self._colors['on_fg'] if selected else self._colors['off_fg'],
             highlightbackground=self._colors['accent'] if selected else self._colors['border'],
         )
 
     def _enter(self, _event=None):
         if str(self.cget('state')) != 'disabled':
-            self.configure(bg=self._colors['hover_bg'])
+            self.configure(bg=self._colors['on_bg'] if self._selected() else self._colors['hover_bg'])
 
     def _leave(self, _event=None):
         self._sync_visual()
@@ -53,7 +58,9 @@ class ThemeToggle(tk.Checkbutton):
 
     def _release(self, _event=None):
         if str(self.cget('state')) != 'disabled':
-            self._sync_visual()
+            # Tk updates the Checkbutton variable in its class binding. Sync on idle so
+            # the final off/on state always wins after a repeated click.
+            self.after_idle(self._sync_visual)
 
     def state(self, spec=None):
         current = ('disabled',) if str(self.cget('state')) == 'disabled' else ()

@@ -150,8 +150,9 @@ class LayoutMixin:
         cb = ttk.Combobox(form_card, values=list(TEMPLATES), textvariable=self.template_name_var, state='readonly')
         cb.grid(row=2, column=5, sticky='ew')
         cb.bind('<<ComboboxSelected>>', self.on_template_change)
-        ttk.Button(form_card, text='扫描文件', image=self.UI_ICONS['scan'], compound='left',
-                   command=self.scan, style='Primary.TButton').grid(row=2, column=6, padx=(8, 0))
+        self.scan_btn = ttk.Button(form_card, text='刷新预览', image=self.UI_ICONS['scan'], compound='left',
+                                   command=self.scan, style='Primary.TButton')
+        self.scan_btn.grid(row=2, column=6, padx=(8, 0))
 
         self.template_label = field_label('模板', 3, 0, 'rule')
         self.template_entry = ttk.Entry(form_card, textvariable=self.template_var, state='disabled')
