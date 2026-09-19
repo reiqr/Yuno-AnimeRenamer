@@ -32,6 +32,14 @@ class LightNovelDetectionTests(unittest.TestCase):
         d = detect_book('86―不存在的战区―Ep.4.epub', '86―不存在的战区―')
         self.assertEqual((d.volume, d.confidence), (4, 98))
 
+    def test_auto_series_title_without_manual_title(self):
+        d = detect_book('十二国记 1 月之影 影之海.epub')
+        self.assertEqual((d.series_title, d.volume, d.volume_title),
+                         ('十二国记', 1, '月之影 影之海'))
+        d = detect_book('狼与香辛料 Vol.03 狼与琥珀色的忧郁.epub')
+        self.assertEqual((d.series_title, d.volume, d.volume_title),
+                         ('狼与香辛料', 3, '狼与琥珀色的忧郁'))
+
     def test_manual_volume_formats(self):
         for text in ('03', 'V03', 'Vol.03', 'Ep.03', '第3卷'):
             with self.subTest(text=text):
@@ -72,6 +80,38 @@ class LightNovelPlanTests(unittest.TestCase):
         plan = self.plan(force_sequence=True, sequence_start=4)
         self.assertEqual([x.volume for x in plan], [4, 5])
         self.assertIn('月之影 影之海', Path(plan[0].new_path).name)
+
+    def test_mixed_series_auto_grouping_when_title_blank(self):
+        self.file('十二国记 1 月之影 影之海.epub')
+        self.file('狼与香辛料 Vol.03 狼与琥珀色的忧郁.epub')
+        plan = build_novel_plan(
+            str(self.root), '', '{title} - {volume:02d} - {volume_title}')
+        self.assertEqual(len(plan), 2)
+        by_series = {item.series_title: item for item in plan}
+        self.assertEqual(set(by_series), {'十二国记', '狼与香辛料'})
+        self.assertEqual(len({item.group_id for item in plan}), 2)
+        self.assertIn('十二国记 - 01 - 月之影 影之海.epub',
+                      Path(by_series['十二国记'].new_path).name)
+        self.assertIn('狼与香辛料 - 03 - 狼与琥珀色的忧郁.epub',
+                      Path(by_series['狼与香辛料'].new_path).name)
+
+    def test_force_sequence_restarts_for_each_auto_series(self):
+        self.file('十二国记 第8卷.epub')
+        self.file('狼与香辛料 Vol.12.epub')
+        plan = build_novel_plan(
+            str(self.root), '', '{title} - 第{volume:02d}卷',
+            force_sequence=True, sequence_start=1)
+        self.assertEqual({item.series_title: item.volume for item in plan},
+                         {'十二国记': 1, '狼与香辛料': 1})
+
+    def test_unnumbered_file_reuses_known_series_prefix(self):
+        self.file('十二国记 第1卷 月之影 影之海.epub')
+        self.file('十二国记 风之万里 黎明之空.epub')
+        plan = build_novel_plan(
+            str(self.root), '', '{title} - 第{volume:02d}卷',
+            force_sequence=True, sequence_start=4)
+        self.assertTrue(all(item.series_title == '十二国记' for item in plan))
+        self.assertEqual([item.volume for item in plan], [4, 5])
 
     def test_missing_volume_requires_review(self):
         self.file('十二国记 风之万里 黎明之空.epub')
