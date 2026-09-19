@@ -1,0 +1,138 @@
+             self.tree.column(col, width=width, minwidth=55)
+         self.tree.tag_configure('group', background='#1A141D', foreground='#FFB5CF',
+@@ -848,16 +884,14 @@
+             self.tree.tag_configure(f'{name}_odd', foreground=fg, background=odd_bg)
+         self.tree.tag_configure('hover', background='#2B1B29', foreground='#FFFFFF')
+         ybar = ttk.Scrollbar(preview, orient='vertical', command=self.tree.yview)
+-        xbar = ttk.Scrollbar(preview, orient='horizontal', command=self.tree.xview)
+-        self.tree.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
++        self.tree.configure(yscrollcommand=ybar.set)
+         self.tree.grid(row=0, column=0, sticky='nsew')
+         ybar.grid(row=0, column=1, sticky='ns')
+-        xbar.grid(row=1, column=0, sticky='ew')
+         preview.columnconfigure(0, weight=1)
+         preview.rowconfigure(0, weight=1)
+         self.tree.bind('<Double-1>', lambda e: self.edit_item())
+         self.tree.bind('<space>', lambda e: self.toggle_skip())
+-        self.tree.bind('<<TreeviewSelect>>', self.show_detail)
++        self.tree.bind('<<TreeviewSelect>>', self._on_tree_select)
+@@ -894,30 +928,6 @@
+-        # Compact log rail: keep detail available without stealing preview height.
+-        detail_outer = tk.Frame(main, bg='#263336', bd=0, highlightthickness=0)
+-        detail_outer.pack(fill='x', pady=(6, 0))
+-        detail_card = ttk.Frame(detail_outer, style='Card.TFrame', padding=(10, 5))
+-        detail_card.pack(fill='x', padx=1, pady=1)
+-        self._clip_card_corners(detail_outer, c['bg'], 3)
+-        self.detail_var = tk.StringVar(value='待确认的文件不会执行。悬停查看识别依据；双击文件可以纠正集数或特别篇。')
+-        ttk.Label(detail_card, text='DIARY LOG', style='Cyan.TLabel').pack(side='left', padx=(0, 10))
+-        ttk.Label(detail_card, textvariable=self.detail_var, style='Card.TLabel', wraplength=780).pack(side='left', fill='x', expand=True)
+-
+-        footer = ttk.Frame(main, style='App.TFrame')
+-        footer.pack(fill='x', pady=(6, 0))
+-        left_footer = ttk.Frame(footer, style='App.TFrame')
+-        left_footer.pack(side='left', fill='x', expand=True)
+-        self.status_var = tk.StringVar(value='选择文件夹，填写作品名，然后扫描未来记录。')
+-        ttk.Label(left_footer, textvariable=self.status_var, style='Muted.TLabel', wraplength=560).pack(anchor='w')
+-        ttk.Button(footer, text='恢复', image=self.UI_ICONS['recover'], compound='left', command=self.recover, style='Ghost.TButton').pack(side='left', padx=(8, 0))
+-        ttk.Button(footer, text='撤销', image=self.UI_ICONS['undo'], compound='left', command=self.undo, style='Danger.TButton').pack(side='left', padx=8)
+-        self.run_btn = ttk.Button(footer, text='改写未来', image=self.UI_ICONS['run'], compound='left', command=self.execute, state='disabled', style='Primary.TButton')
+-        self.run_btn.pack(side='right')
+-        self.footer_state_label = tk.Label(footer, textvariable=self.chrome_state_var, bg=c['bg'], fg=c['cyan'],
+-                  font=(self.FONTS['mono'], 8, 'bold'), bd=0)
+-        self.footer_state_label.pack(side='right', padx=(0, 10))
+@@ -957,10 +967,10 @@
+-        width = max(760, self.tree.winfo_width() - 8)
++        width = max(620, self.tree.winfo_width() - 12)
+         specs = {
+-            '#0': (0.15, 120), 'kind': (0.07, 58), 'old': (0.25, 180),
+-            'detected': (0.11, 92), 'new': (0.25, 180), 'status': (0.17, 145),
++            '#0': (0.12, 80), 'kind': (0.06, 46), 'old': (0.29, 155),
++            'detected': (0.10, 72), 'new': (0.29, 155), 'status': (0.14, 95),
+         }
+@@ -968,6 +978,21 @@
++    def _on_tree_select(self, _event=None):
++        self._sync_selection_markers()
++        self.show_detail()
++
++    def _sync_selection_markers(self):
++        if not hasattr(self, 'tree'):
++            return
++        selected = set(self.tree.selection())
++        for group_iid in self.tree.get_children(''):
++            for row_iid in self.tree.get_children(group_iid):
++                if not self.tree.exists(row_iid):
++                    continue
++                self.tree.item(row_iid, text='┃' if row_iid in selected else '')
+@@ -1001,7 +1026,7 @@
+-            self.detail_var.set('待确认的文件不会执行。悬停查看识别依据；双击文件可以纠正集数或特别篇。')
++            self.detail_var.set('待确认的文件不会执行；悬停查看依据，双击可纠正集数。')
+@@ -1027,12 +1052,21 @@
+         bg, fg, border = palette.get(mode, palette['info'])
++        self._status_mode = mode
+@@
++        if hasattr(self, 'chrome_status_line'):
++            self.chrome_status_line.configure(bg=border)
++        if hasattr(self, 'form_status_line'):
++            self.form_status_line.configure(bg=border)
++        if hasattr(self, 'preview_status_left'):
++            self.preview_status_left.configure(bg=border)
++        if hasattr(self, 'preview_status_right'):
++            self.preview_status_right.configure(bg=fg if mode in ('success', 'busy') else '#285F62')
+@@ -1058,6 +1092,29 @@
++    def _start_busy_animation(self):
++        self._stop_busy_animation()
++        self._busy_anim_step = 0
++        self._busy_anim_tick()
++
++    def _busy_anim_tick(self):
++        if not self.busy:
++            self._busy_anim_id = None
++            return
++        frames = ('PROCESSING ·', 'PROCESSING ··', 'PROCESSING ···')
++        self._set_chrome_state(frames[self._busy_anim_step % len(frames)], 'busy')
++        self._busy_anim_step += 1
++        self._busy_anim_id = self.after(320, self._busy_anim_tick)
++
++    def _stop_busy_animation(self):
++        callback = getattr(self, '_busy_anim_id', None)
++        if callback is not None:
++            try:
++                self.after_cancel(callback)
++            except tk.TclError:
++                pass
++        self._busy_anim_id = None
+@@ -1097,6 +1154,7 @@
+         self.busy = True
++        self._start_busy_animation()
+@@ -1116,6 +1174,7 @@
+                     self.busy = False
++                    self._stop_busy_animation()
+@@ -1186,8 +1245,13 @@
+         ready = sum(x.status == READY for x in plan)
+         review = sum(x.status.startswith('待') for x in plan)
+-        self.status_var.set(f'{len(nodes)} 组 · {len(plan)} 个文件 · 可执行 {ready} · 待确认/填写 {review} · 已跳过 {sum(x.status == "已跳过" for x in plan)}')
++        conflicts = sum(x.status.startswith(('冲突', '错误')) for x in plan)
++        skipped_count = sum(x.status == '已跳过' for x in plan)
++        self.status_var.set(f'{len(nodes)} 组 · {len(plan)} 个文件 · 可执行 {ready} · 待确认/填写 {review} · 已跳过 {skipped_count}')
++        if hasattr(self, 'preview_legend_var'):
++            self.preview_legend_var.set(f'READY {ready}  ·  REVIEW {review}  ·  CONFLICT {conflicts}')
+@@ -1232,7 +1296,7 @@
+-            self.detail_var.set(f'SELECTED · {status} · {item.reason}（规则评分 {item.confidence}/100）\n{item.old_path}\n→ {item.new_path}')
++            self.detail_var.set(f'SELECTED · {status} · {item.reason} · SCORE {item.confidence}/100')
+@@ -1307,6 +1371,7 @@
+         self.detail_var.set('文件状态已改变，请刷新预览。')
++        self.after(50, self.check_recovery)
+@@ -1318,9 +1383,14 @@
+-            if pending_operation():
+-                self.status_var.set('发现未完成的操作，请先点击“恢复中断操作”。')
++            has_pending = bool(pending_operation())
++            if has_pending:
++                if hasattr(self, 'recover_btn') and not self.recover_btn.winfo_ismapped():
++                    self.recover_btn.pack(side='right', padx=(0, 6), before=self.undo_btn)
++                self.status_var.set('发现未完成的操作，请点击青色恢复按钮。')
+                 self._set_chrome_state('RECOVERY REQUIRED', 'warning')
++            elif hasattr(self, 'recover_btn') and self.recover_btn.winfo_ismapped():
++                self.recover_btn.pack_forget()
+@@ -1331,6 +1401,7 @@
+     def destroy(self):
++        self._stop_busy_animation()
