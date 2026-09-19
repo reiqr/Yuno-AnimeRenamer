@@ -1,0 +1,2 @@
+             self.after_cancel(callback)
+         super().destroy()
