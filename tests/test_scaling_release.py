@@ -8,6 +8,12 @@ import package_release as release
 import renamer_core as core
 
 
+UI_MODULES = [
+    'ui_actions.py', 'ui_constants.py', 'ui_dialogs.py', 'ui_layout.py',
+    'ui_styles.py', 'ui_theme.py', 'ui_view.py',
+]
+
+
 class IndexedSubtitleMatchingTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='anime_index_')
@@ -45,8 +51,8 @@ class ReleasePackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='anime_release_') as td:
             root = Path(td)
             for name in [
-                'AnimeRenamer.pyw', 'renamer_core.py', 'file_operations.py', 'README.md',
-                'CHANGELOG.md', 'LICENSE', 'build_exe.bat', 'package_release.py',
+                'AnimeRenamer.pyw', 'renamer_core.py', 'file_operations.py', *UI_MODULES,
+                'README.md', 'CHANGELOG.md', 'LICENSE', 'build_exe.bat', 'package_release.py',
                 'windows_version_info.txt', 'refresh_icon_cache.bat', 'run_app.bat',
                 '运行 AnimeRenamer.bat', '生成EXE.bat',
             ]:
@@ -67,6 +73,8 @@ class ReleasePackagingTests(unittest.TestCase):
                 names = set(z.namelist())
             prefix = f'AnimeRenamer_v{core.VERSION}/'
             self.assertIn(prefix + 'LICENSE', names)
+            for module in UI_MODULES:
+                self.assertIn(prefix + module, names)
             self.assertIn(prefix + 'AnimeRenamer_FutureDiary.exe', names)
             self.assertNotIn(prefix + 'AnimeRenamer.exe', names)
 
