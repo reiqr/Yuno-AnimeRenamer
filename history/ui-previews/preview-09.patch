@@ -1,0 +1,142 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.233051614 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.231813096 +0000
+@@ -255,6 +255,52 @@
+         except tk.TclError:
+             return None
++
++    def _make_pixel_icon(self, kind, color='#FF6EA3', size=14):
++        img = tk.PhotoImage(width=size, height=size)
++
++        def px(x0, y0, x1=None, y1=None, fill=None):
++            x1 = x0 + 1 if x1 is None else x1
++            y1 = y0 + 1 if y1 is None else y1
++            img.put(fill or color, to=(x0, y0, x1, y1))
++
++        if kind == 'folder':
++            px(1, 4, 13, 12); px(2, 2, 6, 5); px(2, 5, 12, 11, '#2A1A24'); px(3, 6, 11, 10, '#3B2634')
++        elif kind == 'scan':
++            px(2, 2, 5, 3); px(2, 2, 3, 5); px(9, 2, 12, 3); px(11, 2, 12, 5); px(2, 9, 3, 12); px(2, 11, 5, 12); px(11, 9, 12, 12); px(9, 11, 12, 12); px(5, 6, 9, 8)
++        elif kind == 'title':
++            px(2, 3, 12, 4); px(6, 4, 8, 12); px(4, 11, 10, 12)
++        elif kind == 'season':
++            px(2, 2, 12, 12); px(3, 4, 11, 11, '#231821'); px(3, 5, 11, 6); px(5, 1, 6, 4); px(9, 1, 10, 4); px(5, 7, 7, 9)
++        elif kind == 'rule':
++            px(2, 2, 12, 3); px(2, 6, 10, 7); px(2, 10, 12, 11); px(10, 5, 12, 8)
++        elif kind == 'mode':
++            px(2, 4, 8, 10); px(6, 2, 12, 8); px(7, 3, 11, 7, '#231821')
++        elif kind == 'target':
++            px(2, 2, 12, 3); px(2, 3, 3, 12); px(2, 11, 12, 12); px(6, 5, 12, 6); px(9, 3, 12, 8)
++        elif kind == 'group':
++            px(2, 2, 6, 6); px(8, 2, 12, 6); px(5, 8, 9, 12); px(3, 6, 4, 9); px(10, 6, 11, 9); px(3, 8, 11, 9)
++        elif kind == 'edit':
++            px(2, 10, 5, 12); px(4, 8, 11, 11); px(9, 3, 12, 6); px(6, 6, 11, 10)
++        elif kind == 'skip':
++            px(2, 6, 10, 8); px(8, 3, 12, 11); px(10, 5, 13, 9)
++        elif kind == 'reset':
++            px(3, 3, 10, 4); px(2, 4, 4, 10); px(3, 10, 10, 12); px(9, 8, 12, 11); px(1, 2, 5, 6)
++        elif kind == 'recover':
++            px(2, 3, 11, 4); px(2, 3, 3, 10); px(2, 9, 9, 11); px(8, 7, 11, 11); px(9, 5, 13, 9)
++        elif kind == 'undo':
++            px(4, 3, 11, 4); px(3, 4, 5, 10); px(4, 9, 11, 11); px(1, 2, 5, 6)
++        elif kind == 'run':
++            px(3, 2, 5, 12); px(5, 3, 7, 11); px(7, 4, 9, 10); px(9, 5, 11, 9); px(11, 6, 13, 8)
++        elif kind == 'clear':
++            px(3, 3, 11, 4); px(4, 4, 10, 12); px(2, 2, 12, 3); px(5, 1, 9, 2)
++        else:
++            px(3, 3, 11, 11); px(5, 5, 9, 9, '#231821')
++        self._theme_images.append(img)
++        return img
+@@ -271,10 +317,15 @@
+-        canvas.create_text(tx, 75, text='扫描  /  校对  /  预览  /  改写未来', anchor='w', fill='#C9BCC5',
+-                           font=(self.FONTS['body'], 9), tags='overlay')
+-        canvas.create_line(tx, 92, min(width - 24, tx + 300), 92, fill='#6E294A', width=1, tags='overlay')
++        canvas.create_text(tx, 75, text='01 SCAN   →   02 CHECK   →   03 REWRITE', anchor='w', fill='#C9BCC5', font=(self.FONTS['mono'], 8, 'bold'), tags='overlay')
++        canvas.create_line(tx, 92, min(width - 24, tx + 180), 92, fill='#FF4F91', width=2, tags='overlay')
++        canvas.create_line(min(width - 24, tx + 180), 92, min(width - 24, tx + 300), 92, fill='#38D6D0', width=2, tags='overlay')
++        canvas.create_rectangle(0, 103, width, 106, fill='#0A080D', outline='', tags='overlay')
++        canvas.create_line(0, 103, min(width, int(width * 0.38)), 103, fill='#8C2B59', width=1, tags='overlay')
++        canvas.create_line(max(0, int(width * 0.72)), 103, width, 103, fill='#245A5A', width=1, tags='overlay')
+@@ -445,6 +496,7 @@
+         c = self.COLORS
+         self.configure(bg=c['bg'])
+         self._theme_images = []
++        self.UI_ICONS = {}
+@@ -453,6 +505,22 @@
+         self.option_add('*Font', (self.FONTS['body'], 9))
++        self.UI_ICONS = {
++            'folder': self._make_pixel_icon('folder', c['pink']), 'scan': self._make_pixel_icon('scan', '#FFFFFF'),
++            'title': self._make_pixel_icon('title', '#D985AC'), 'season': self._make_pixel_icon('season', c['cyan']),
++            'rule': self._make_pixel_icon('rule', '#B987C7'), 'mode': self._make_pixel_icon('mode', '#C095B0'),
++            'target': self._make_pixel_icon('target', c['cyan']), 'group': self._make_pixel_icon('group', '#DDA5C0'),
++            'edit': self._make_pixel_icon('edit', c['pink']), 'skip': self._make_pixel_icon('skip', c['warning']),
++            'reset': self._make_pixel_icon('reset', '#A89BA6'), 'recover': self._make_pixel_icon('recover', c['cyan']),
++            'undo': self._make_pixel_icon('undo', '#FF8B99'), 'run': self._make_pixel_icon('run', '#FFFFFF'),
++        }
+@@ -602,9 +670,13 @@
+-        ttk.Label(side_text, text='●  PINK   改写 / 主操作', style='SidebarMuted.TLabel').pack(anchor='w', pady=2)
+-        ttk.Label(side_text, text='●  CYAN   安全 / 可执行', style='SidebarMuted.TLabel').pack(anchor='w', pady=2)
+-        ttk.Label(side_text, text='●  RED    冲突 / 风险', style='SidebarMuted.TLabel').pack(anchor='w', pady=2)
++        ttk.Label(side_text, text='DIARY FLOW', style='HeroSub.TLabel').pack(anchor='w', pady=(0, 5))
++        ttk.Label(side_text, text='01  SCAN     读取文件', style='SidebarMuted.TLabel', font=(self.FONTS['mono'], 8, 'bold')).pack(anchor='w', pady=1)
++        ttk.Label(side_text, text='02  CHECK    校对未来', style='SidebarMuted.TLabel', font=(self.FONTS['mono'], 8, 'bold')).pack(anchor='w', pady=1)
++        ttk.Label(side_text, text='03  REWRITE  执行改名', style='SidebarMuted.TLabel', font=(self.FONTS['mono'], 8, 'bold')).pack(anchor='w', pady=1)
+@@ -613,7 +685,7 @@
+-        ttk.Label(chrome, text='未来日记 · Theme Surface', style='Accent.TLabel').grid(row=0, column=1, sticky='w', padx=(10, 0))
++        ttk.Label(chrome, text='未来日记 · DIARY CONTROL', style='Accent.TLabel').grid(row=0, column=1, sticky='w', padx=(10, 0))
+@@ -645,35 +717,40 @@
+-        def field_label(text, row, col):
+-            ttk.Label(form_card, text=text, style='MutedPanel.TLabel').grid(row=row, column=col, sticky='w', padx=(0, 8), pady=5)
++        def field_label(text, row, col, icon_key):
++            ttk.Label(form_card, text=text, image=self.UI_ICONS.get(icon_key), compound='left', style='MutedPanel.TLabel').grid(row=row, column=col, sticky='w', padx=(0, 8), pady=5)
+@@
+-        field_label('输入文件夹', 1, 0)
++        field_label('输入文件夹', 1, 0, 'folder')
+@@
+-        ttk.Button(form_card, text='BROWSE · 浏览', command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
++        ttk.Button(form_card, text='浏览', image=self.UI_ICONS['folder'], compound='left', command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
+@@
+-        field_label('作品名称', 2, 0)
++        field_label('作品名称', 2, 0, 'title')
+@@
+-        field_label('季度', 2, 2)
++        field_label('季度', 2, 2, 'season')
+@@
+-        field_label('命名规则', 2, 4)
++        field_label('命名规则', 2, 4, 'rule')
+@@
+-        ttk.Button(form_card, text='SCAN · 扫描文件', command=self.scan, style='Primary.TButton').grid(row=2, column=6, padx=(8, 0))
++        ttk.Button(form_card, text='扫描文件', image=self.UI_ICONS['scan'], compound='left', command=self.scan, style='Primary.TButton').grid(row=2, column=6, padx=(8, 0))
+@@
+-        field_label('模板', 3, 0)
++        field_label('模板', 3, 0, 'rule')
+@@
+-        field_label('操作方式', 4, 0)
++        field_label('操作方式', 4, 0, 'mode')
+@@
+-        field_label('复制到', 4, 2)
++        field_label('复制到', 4, 2, 'target')
+@@
+-        ttk.Button(form_card, text='SELECT · 选择', command=self.choose_output, style='Ghost.TButton').grid(row=4, column=6, padx=(8, 0))
++        ttk.Button(form_card, text='选择目录', image=self.UI_ICONS['target'], compound='left', command=self.choose_output, style='Ghost.TButton').grid(row=4, column=6, padx=(8, 0))
+@@ -698,10 +775,10 @@
+-        ttk.Button(toolbar, text='GROUP · 分组设置', command=self.edit_group, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='EDIT · 纠正集数', command=self.edit_item, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='SKIP · 跳过/恢复', command=self.toggle_skip, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='RESET · 清除纠正', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='分组设置', image=self.UI_ICONS['group'], compound='left', command=self.edit_group, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='纠正集数', image=self.UI_ICONS['edit'], compound='left', command=self.edit_item, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='跳过 / 恢复', image=self.UI_ICONS['skip'], compound='left', command=self.toggle_skip, style='Ghost.TButton').pack(side='left', padx=(0, 7))
++        ttk.Button(toolbar, text='清除纠正', image=self.UI_ICONS['reset'], compound='left', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+@@ -716,11 +793,11 @@
+-        self.tree.heading('#0', text='分组 / GROUP')
++        self.tree.heading('#0', text='GROUP  /  分组')
+@@
+-        for col, label, width in [('kind', '类型', 55), ('old', '原文件名', 255), ('detected', '识别结果', 105), ('new', '目标文件名', 255), ('status', '状态', 200)]:
++        for col, label, width in [('kind', 'TYPE', 55), ('old', 'SOURCE NAME  /  原文件名', 255), ('detected', 'DETECTED', 105), ('new', 'TARGET NAME  /  目标文件名', 255), ('status', 'STATE  /  状态', 200)]:
+@@ -784,9 +861,9 @@
+-        ttk.Button(footer, text='RECOVER · 恢复', command=self.recover, style='Ghost.TButton').pack(side='left', padx=(8, 0))
+-        ttk.Button(footer, text='UNDO · 撤销', command=self.undo, style='Danger.TButton').pack(side='left', padx=8)
+-        self.run_btn = ttk.Button(footer, text='RUN · 改写未来', command=self.execute, state='disabled', style='Primary.TButton')
++        ttk.Button(footer, text='恢复', image=self.UI_ICONS['recover'], compound='left', command=self.recover, style='Ghost.TButton').pack(side='left', padx=(8, 0))
++        ttk.Button(footer, text='撤销', image=self.UI_ICONS['undo'], compound='left', command=self.undo, style='Danger.TButton').pack(side='left', padx=8)
++        self.run_btn = ttk.Button(footer, text='改写未来', image=self.UI_ICONS['run'], compound='left', command=self.execute, state='disabled', style='Primary.TButton')
