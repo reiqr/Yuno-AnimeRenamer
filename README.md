@@ -84,4 +84,4 @@ python -m unittest discover -s tests -v
 python package_release.py
 ```
 
-发布包输出到 `dist`，ZIP 仅包含源码、测试、文档、启动/构建脚本和 EXE（已构建时），不包含 Git、缓存或真实媒体文件。
+发布包输出到 `dist`，ZIP 仅包含源码、主题素材、测试、文档、启动/构建脚本和 EXE（已构建时），不包含 Git、缓存或真实媒体文件。`assets/` 为界面主题图，属程序资源，非用户媒体文件。

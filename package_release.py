@@ -15,6 +15,7 @@ def package():
              'package_release.py', 'windows_version_info.txt']
     files = [(root / name, name) for name in names]
     files += [(p, p.relative_to(root).as_posix()) for p in sorted((root / 'tests').glob('test_*.py'))]
+    files += [(p, p.relative_to(root).as_posix()) for p in sorted((root / 'assets').glob('*.png'))]
     exe = output / 'AnimeRenamer.exe'
     if exe.exists():
         files.append((exe, 'AnimeRenamer.exe'))
