@@ -1,0 +1,180 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.231813096 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.231508446 +0000
+@@ -310,22 +310,24 @@
+         if getattr(self, 'banner_photo', None):
+             canvas.create_image(0, 0, image=self.banner_photo, anchor='nw', tags='overlay')
+         # Dark veil on the right keeps text readable without altering the asset.
+-        canvas.create_rectangle(max(360, int(width * 0.44)), 0, width, 106,
++        height = max(88, canvas.winfo_height())
++        canvas.create_rectangle(max(360, int(width * 0.44)), 0, width, height,
+                                 fill='#0D0910', stipple='gray50', outline='', tags='overlay')
+         tx = max(470, int(width * 0.58))
+-        canvas.create_text(tx, 24, text='ANIME RENAMER', anchor='w', fill='#FFF2F7',
+-                           font=(self.FONTS['latin'], 19, 'bold'), tags='overlay')
+-        canvas.create_text(tx, 51, text='未来日记 · RENAME TERMINAL', anchor='w', fill='#FF6EA3',
+-                           font=(self.FONTS['body'], 10, 'bold'), tags='overlay')
+-        canvas.create_text(tx, 75, text='01 SCAN   →   02 CHECK   →   03 REWRITE', anchor='w', fill='#C9BCC5',
+-                           font=(self.FONTS['mono'], 8, 'bold'), tags='overlay')
+-        canvas.create_line(tx, 92, min(width - 24, tx + 180), 92,
++        canvas.create_text(tx, 17, text='ANIME RENAMER', anchor='w', fill='#FFF2F7',
++                           font=(self.FONTS['latin'], 17, 'bold'), tags='overlay')
++        canvas.create_text(tx, 37, text='未来日记 · RENAME TERMINAL', anchor='w', fill='#FF6EA3',
++                           font=(self.FONTS['body'], 9, 'bold'), tags='overlay')
++        canvas.create_text(tx, 56, text='01 SCAN   →   02 CHECK   →   03 REWRITE', anchor='w', fill='#C9BCC5',
++                           font=(self.FONTS['mono'], 7, 'bold'), tags='overlay')
++        line_y = min(height - 8, 70)
++        canvas.create_line(tx, line_y, min(width - 24, tx + 170), line_y,
+                            fill='#FF4F91', width=2, tags='overlay')
+-        canvas.create_line(min(width - 24, tx + 180), 92, min(width - 24, tx + 300), 92,
++        canvas.create_line(min(width - 24, tx + 170), line_y, min(width - 24, tx + 280), line_y,
+                            fill='#38D6D0', width=2, tags='overlay')
+-        canvas.create_rectangle(0, 103, width, 106, fill='#0A080D', outline='', tags='overlay')
+-        canvas.create_line(0, 103, min(width, int(width * 0.38)), 103, fill='#8C2B59', width=1, tags='overlay')
+-        canvas.create_line(max(0, int(width * 0.72)), 103, width, 103, fill='#245A5A', width=1, tags='overlay')
++        canvas.create_rectangle(0, height - 3, width, height, fill='#0A080D', outline='', tags='overlay')
++        canvas.create_line(0, height - 3, min(width, int(width * 0.38)), height - 3, fill='#8C2B59', width=1, tags='overlay')
++        canvas.create_line(max(0, int(width * 0.72)), height - 3, width, height - 3, fill='#245A5A', width=1, tags='overlay')
+ 
+     def _legacy_dialog_mode(self):
+         # The bundled GUI tests monkey-patch tkinter dialogs. Keep that path intact.
+@@ -543,7 +545,10 @@
+         style.configure('App.TFrame', background=c['bg'])
+         style.configure('Panel.TFrame', background=c['panel'])
+         style.configure('Card.TFrame', background=c['panel2'])
+-        style.configure('Toolbar.TFrame', background='#17131B')
++        style.configure('Toolbar.TFrame', background='#17131B', borderwidth=1, relief='solid',
++                        bordercolor='#352936', lightcolor='#352936', darkcolor='#352936')
++        style.configure('Chrome.TFrame', background=c['panel'], borderwidth=1, relief='solid',
++                        bordercolor='#342934', lightcolor='#342934', darkcolor='#342934')
+         style.configure('Sidebar.TFrame', background='#110C14')
+         style.configure('TLabel', background=c['bg'], foreground=c['text'])
+         style.configure('Panel.TLabel', background=c['panel'], foreground=c['text'])
+@@ -681,8 +686,8 @@
+                   font=(self.FONTS['mono'], 8)).pack(side='bottom', anchor='w')
+ 
+         # Compact themed chrome strip under the system title bar.
+-        chrome = ttk.Frame(main, style='Panel.TFrame', padding=(12, 8))
+-        chrome.pack(fill='x', pady=(0, 10))
++        chrome = ttk.Frame(main, style='Chrome.TFrame', padding=(11, 6))
++        chrome.pack(fill='x', pady=(0, 7))
+         chrome.columnconfigure(1, weight=1)
+         ttk.Label(chrome, text='ANIME RENAMER', style='Cyan.TLabel').grid(row=0, column=0, sticky='w')
+         ttk.Label(chrome, text='未来日记 · DIARY CONTROL', style='Accent.TLabel').grid(row=0, column=1, sticky='w', padx=(10, 0))
+@@ -694,16 +699,19 @@
+ 
+         # Image-backed top banner. Text is rendered by Tk to keep Chinese/Japanese crisp.
+         self.banner_photo = self._load_photo('yuno_banner.png')
+-        self.banner_canvas = tk.Canvas(main, height=106, bg='#140C13', bd=0,
++        self.banner_canvas = tk.Canvas(main, height=82, bg='#140C13', bd=0,
+                                        highlightthickness=1, highlightbackground='#3A2835', relief='flat')
+-        self.banner_canvas.pack(fill='x', pady=(0, 11))
++        self.banner_canvas.pack(fill='x', pady=(0, 8))
+         self.banner_canvas.bind('<Configure>', self._draw_banner)
+         self.after_idle(self._draw_banner)
+ 
+-        # Form card
+-        form_card = ttk.Frame(main, style='Panel.TFrame', padding=(12, 9))
+-        form_card.pack(fill='x')
+-        ttk.Label(form_card, text='01  日记源 / FILE SOURCE', style='Section.TLabel').grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 8))
++        # Form card: subtle 1px diary-card boundary, not a generic boxed panel.
++        form_outer = tk.Frame(main, bg='#3B2A36', bd=0, highlightthickness=0)
++        form_outer.pack(fill='x')
++        tk.Frame(form_outer, bg='#7B2C52', height=2, bd=0).pack(fill='x')
++        form_card = ttk.Frame(form_outer, style='Panel.TFrame', padding=(11, 7))
++        form_card.pack(fill='x', padx=1, pady=(0, 1))
++        ttk.Label(form_card, text='01  日记源 / FILE SOURCE', style='Section.TLabel').grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 5))
+         self.folder_var = tk.StringVar()
+         self.title_var = tk.StringVar()
+         self.season_var = tk.StringVar(value='1')
+@@ -718,16 +726,18 @@
+         self.start_var = tk.StringVar(value='1')
+ 
+         def field_label(text, row, col, icon_key):
+-            ttk.Label(form_card, text=text, image=self.UI_ICONS.get(icon_key), compound='left',
+-                      style='MutedPanel.TLabel').grid(row=row, column=col, sticky='w', padx=(0, 8), pady=5)
++            label = ttk.Label(form_card, text=text, image=self.UI_ICONS.get(icon_key), compound='left',
++                              style='MutedPanel.TLabel')
++            label.grid(row=row, column=col, sticky='w', padx=(0, 8), pady=4)
++            return label
+ 
+         field_label('输入文件夹', 1, 0, 'folder')
+-        ttk.Entry(form_card, textvariable=self.folder_var).grid(row=1, column=1, columnspan=5, sticky='ew', pady=6, padx=(0, 2))
++        ttk.Entry(form_card, textvariable=self.folder_var).grid(row=1, column=1, columnspan=5, sticky='ew', pady=4, padx=(0, 2))
+         ttk.Button(form_card, text='浏览', image=self.UI_ICONS['folder'], compound='left',
+                    command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
+ 
+         field_label('作品名称', 2, 0, 'title')
+-        ttk.Entry(form_card, textvariable=self.title_var, width=26).grid(row=2, column=1, sticky='ew', pady=6, padx=(0, 8))
++        ttk.Entry(form_card, textvariable=self.title_var, width=26).grid(row=2, column=1, sticky='ew', pady=4, padx=(0, 8))
+         field_label('季度', 2, 2, 'season')
+         ttk.Spinbox(form_card, from_=0, to=99, width=5, textvariable=self.season_var).grid(row=2, column=3, sticky='ew')
+         field_label('命名规则', 2, 4, 'rule')
+@@ -737,23 +747,26 @@
+         ttk.Button(form_card, text='扫描文件', image=self.UI_ICONS['scan'], compound='left',
+                    command=self.scan, style='Primary.TButton').grid(row=2, column=6, padx=(8, 0))
+ 
+-        field_label('模板', 3, 0, 'rule')
++        self.template_label = field_label('模板', 3, 0, 'rule')
+         self.template_entry = ttk.Entry(form_card, textvariable=self.template_var, state='disabled')
+-        self.template_entry.grid(row=3, column=1, columnspan=5, sticky='ew', pady=5)
+-        ttk.Label(form_card, text='{title}  /  {season}  /  {episode}', style='MutedPanel.TLabel',
+-                  font=(self.FONTS['mono'], 8)).grid(row=3, column=6, sticky='w', padx=(8, 0))
++        self.template_entry.grid(row=3, column=1, columnspan=5, sticky='ew', pady=4)
++        self.template_hint = ttk.Label(form_card, text='{title}  /  {season}  /  {episode}', style='MutedPanel.TLabel',
++                                       font=(self.FONTS['mono'], 8))
++        self.template_hint.grid(row=3, column=6, sticky='w', padx=(8, 0))
+ 
+         field_label('操作方式', 4, 0, 'mode')
+-        ttk.Combobox(form_card, textvariable=self.mode_var, state='readonly',
+-                     values=['原地重命名', '复制整理（保留原文件）']).grid(row=4, column=1, sticky='ew', pady=5)
+-        field_label('复制到', 4, 2, 'target')
++        self.mode_combo = ttk.Combobox(form_card, textvariable=self.mode_var, state='readonly',
++                                       values=['原地重命名', '复制整理（保留原文件）'])
++        self.mode_combo.grid(row=4, column=1, sticky='ew', pady=4)
++        self.output_label = field_label('复制到', 4, 2, 'target')
+         self.output_entry = ttk.Entry(form_card, textvariable=self.output_var)
+         self.output_entry.grid(row=4, column=3, columnspan=3, sticky='ew')
+-        ttk.Button(form_card, text='选择目录', image=self.UI_ICONS['target'], compound='left',
+-                   command=self.choose_output, style='Ghost.TButton').grid(row=4, column=6, padx=(8, 0))
++        self.output_button = ttk.Button(form_card, text='选择目录', image=self.UI_ICONS['target'], compound='left',
++                                        command=self.choose_output, style='Ghost.TButton')
++        self.output_button.grid(row=4, column=6, padx=(8, 0))
+ 
+         opts = ttk.Frame(form_card, style='Panel.TFrame')
+-        opts.grid(row=5, column=0, columnspan=7, sticky='ew', pady=(11, 3))
++        opts.grid(row=5, column=0, columnspan=7, sticky='ew', pady=(8, 2))
+         ttk.Label(opts, text='OPTIONS', style='Cyan.TLabel').pack(side='left', padx=(0, 10))
+         toggle_colors = {
+             'off_bg': '#1B1620', 'off_fg': '#B7A9B3', 'on_bg': '#46203A', 'on_fg': '#FFF3F8',
+@@ -771,26 +784,36 @@
+         ttk.Spinbox(opts, from_=1, to=9999, textvariable=self.start_var, width=6).pack(side='left')
+         form_card.columnconfigure(1, weight=2)
+         form_card.columnconfigure(5, weight=2)
++        self._update_conditional_rows()
+ 
+         # Action strip
+-        toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(10, 8))
+-        toolbar.pack(fill='x', pady=(10, 8))
++        toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(9, 6))
++        toolbar.pack(fill='x', pady=(7, 7))
+         ttk.Button(toolbar, text='分组设置', image=self.UI_ICONS['group'], compound='left', command=self.edit_group, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+         ttk.Button(toolbar, text='纠正集数', image=self.UI_ICONS['edit'], compound='left', command=self.edit_item, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+         ttk.Button(toolbar, text='跳过 / 恢复', image=self.UI_ICONS['skip'], compound='left', command=self.toggle_skip, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+         ttk.Button(toolbar, text='清除纠正', image=self.UI_ICONS['reset'], compound='left', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+         ttk.Label(toolbar, text='双击文件纠正 · 空格切换跳过', style='Muted.TLabel').pack(side='right')
+ 
+-        # Preview card
+-        preview_card = ttk.Frame(main, style='Panel.TFrame', padding=(8, 8))
+-        preview_card.pack(fill='both', expand=True)
++        # Preview card gets the strongest boundary and owns most of the vertical space.
++        preview_outer = tk.Frame(main, bg='#4A3040', bd=0, highlightthickness=0)
++        preview_outer.pack(fill='both', expand=True)
++        accent = tk.Frame(preview_outer, bg='#4A3040', height=2, bd=0)
++        accent.pack(fill='x')
++        tk.Frame(accent, bg='#A52C62', width=220, bd=0).pack(side='left', fill='y')
++        tk.Frame(accent, bg='#285F62', width=90, bd=0).pack(side='right', fill='y')
++        preview_card = ttk.Frame(preview_outer, style='Panel.TFrame', padding=(8, 7))
++        preview_card.pack(fill='both', expand=True, padx=1, pady=(0, 1))
+         preview_head = ttk.Frame(preview_card, style='Panel.TFrame')
+         preview_head.pack(fill='x', pady=(0, 7))
+         ttk.Label(preview_head, text='02  未来记录 / RENAME PREVIEW', style='Section.TLabel').pack(side='left')
