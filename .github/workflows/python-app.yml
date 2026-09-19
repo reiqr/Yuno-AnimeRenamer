@@ -1,39 +1,115 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
-name: Python application
+name: AnimeRenamer CI & Windows Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-jobs:
-  build:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-    runs-on: ubuntu-latest
+env:
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  test:
+    name: Test on Windows
+    runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.10"
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: |
-        pytest
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install test dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pytest>=9,<10" "flake8>=7,<8"
+          if (Test-Path requirements.txt) {
+            python -m pip install -r requirements.txt
+          }
+
+      - name: Check critical Python errors
+        run: python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Run tests
+        run: python -m pytest -q
+
+  build:
+    name: Build Windows EXE
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pyinstaller>=6,<7"
+          if (Test-Path requirements.txt) {
+            python -m pip install -r requirements.txt
+          }
+
+      - name: Build AnimeRenamer_FutureDiary.exe
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --noupx `
+            --name AnimeRenamer_FutureDiary `
+            --version-file "$PWD\windows_version_info.txt" `
+            --icon "$PWD\assets\app_icon.ico" `
+            --add-data "$PWD\assets;assets" `
+            --distpath "$PWD\dist" `
+            AnimeRenamer.pyw
+
+          if (-not (Test-Path "dist\AnimeRenamer_FutureDiary.exe")) {
+            throw "PyInstaller completed without producing dist\AnimeRenamer_FutureDiary.exe"
+          }
+
+      - name: Create release ZIP
+        run: python package_release.py
+
+      - name: Generate SHA256 checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            Get-Item "dist\AnimeRenamer_FutureDiary.exe"
+            Get-ChildItem "dist\AnimeRenamer_v*.zip" -File
+          )
+          $lines = $files | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)"
+          }
+          $lines | Set-Content -Encoding ascii "dist\SHA256SUMS.txt"
+          Get-Content "dist\SHA256SUMS.txt"
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimeRenamer-Windows-${{ github.run_number }}
+          path: |
+            dist/AnimeRenamer_FutureDiary.exe
+            dist/AnimeRenamer_v*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
