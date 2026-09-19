@@ -33,6 +33,7 @@ class BookDetection:
     reason: str = '未识别卷数'
     volume_title: str = ''
     part: str = ''
+    series_title: str = ''
 
 
 @dataclass
@@ -53,6 +54,7 @@ class BookRenameItem:
     volume: int | str | None = None
     volume_title: str = ''
     part: str = ''
+    series_title: str = ''
 
 
 class _VolumeNumber:
@@ -111,9 +113,24 @@ def _normalize_part(raw):
     return mapping.get(token, token)
 
 
+def _trim_book_text(text):
+    text = _strip_edition_tags(text or '')
+    text = re.sub(r'^[\s._\-–—·:：]+|[\s._\-–—·:：]+$', '', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def _match_known_series(filename, known_titles):
+    """Return the longest previously detected series title matching this file prefix."""
+    stem = _strip_edition_tags(Path(filename).stem.strip())
+    folded = stem.casefold()
+    matches = [title for title in known_titles if title and folded.startswith(title.casefold())]
+    return max(matches, key=len) if matches else ''
+
+
 def detect_book(filename, title=''):
     stem = _strip_edition_tags(Path(filename).stem.strip())
-    working = _remove_title_once(stem, title)
+    explicit_title = (title or '').strip()
+    working = _remove_title_once(stem, explicit_title)
     number = r'(\d{1,4}(?:\.\d{1,3})?)'
     candidates = []
     for score, pattern, reason in [
@@ -132,25 +149,32 @@ def detect_book(filename, title=''):
         for match in re.finditer(r'(?<![\d.])(\d{1,3}(?:\.\d{1,3})?)(?![\d.])', working):
             candidates.append((82, _number(match[1]), '独立数字卷数', match.span()))
     if not candidates:
-        return BookDetection()
+        return BookDetection(series_title=explicit_title)
 
     best = max(x[0] for x in candidates)
     top = [x for x in candidates if x[0] == best]
     if len({x[1] for x in top}) != 1:
-        return BookDetection(confidence=25, reason='多个卷数候选，请确认')
+        return BookDetection(confidence=25, reason='多个卷数候选，请确认', series_title=explicit_title)
     score, volume, reason, span = top[0]
 
-    remainder = working[:span[0]] + ' ' + working[span[1]:]
+    inferred_title = explicit_title
+    if explicit_title:
+        remainder = working[:span[0]] + ' ' + working[span[1]:]
+    else:
+        # With no user-supplied title, the text before a high-confidence volume token is
+        # the safest series-title signal. Keep the text after it as the volume subtitle.
+        prefix = _trim_book_text(working[:span[0]])
+        inferred_title = prefix
+        remainder = working[span[1]:] if prefix else working[:span[0]] + ' ' + working[span[1]:]
+
     part_match = re.search(
         r'(?<![\w])(?:上册|上卷|上部|上篇|中册|中卷|中部|中篇|下册|下卷|下部|下篇|前篇|后篇|上|中|下)(?![\w])',
         remainder)
     part = _normalize_part(part_match.group(0)) if part_match else ''
     if part_match:
         remainder = remainder[:part_match.start()] + ' ' + remainder[part_match.end():]
-    remainder = _strip_edition_tags(remainder)
-    remainder = re.sub(r'^[\s._\-–—·:：]+|[\s._\-–—·:：]+$', '', remainder)
-    remainder = re.sub(r'\s+', ' ', remainder).strip()
-    return BookDetection(volume, score, reason, remainder, part)
+    remainder = _trim_book_text(remainder)
+    return BookDetection(volume, score, reason, remainder, part, inferred_title)
 
 
 def format_book_name(template, title, volume, volume_title='', part=''):
@@ -200,17 +224,43 @@ def build_novel_plan(folder, title, template, recursive=False, force_sequence=Fa
 
     groups, overrides, skipped = group_settings or {}, overrides or {}, set(skipped or [])
     paths = sorted(_iter_books(root, recursive), key=lambda p: core.natural_key(p.relative_to(root)))
+    global_title = (title or '').strip()
+
+    # First pass: discover series names from explicit volume markers. If another file in
+    # the same mixed folder has no volume marker, reuse the longest known title prefix so
+    # sequence mode can still group it with the correct series.
+    preliminary = {path: detect_book(path.name, global_title) for path in paths}
+    if not global_title:
+        known_titles = sorted({d.series_title for d in preliminary.values() if d.series_title}, key=len, reverse=True)
+        for path in paths:
+            if preliminary[path].series_title:
+                continue
+            matched = _match_known_series(path.name, known_titles)
+            if matched:
+                preliminary[path] = detect_book(path.name, matched)
+
+    def base_series(path):
+        return global_title or preliminary[path].series_title
 
     def group_for(path):
         relative = path.parent.relative_to(root).as_posix()
-        return f'{relative}|BOOK', relative
+        series = base_series(path)
+        token = re.sub(r'\s+', ' ', series).strip().casefold() if series else '__unknown__'
+        return f'{relative}|BOOK|{token}', relative, series
 
-    detections, counters = {}, {}
+    def group_options(key, relative):
+        # Accept the short-lived v1 light-novel group id so in-session settings survive
+        # an upgrade to automatic per-series grouping.
+        return groups.get(key, groups.get(f'{relative}|BOOK', GroupSettings()))
+
+    detections, item_titles, group_meta, counters = {}, {}, {}, {}
     for path in paths:
-        key, _ = group_for(path)
-        options = groups.get(key, GroupSettings())
-        item_title = options.title.strip() or title.strip()
-        detection = detect_book(path.name, item_title)
+        key, relative, inferred_title = group_for(path)
+        options = group_options(key, relative)
+        item_title = options.title.strip() or inferred_title
+        detection = detect_book(path.name, item_title) if item_title else preliminary[path]
+        if item_title and not detection.series_title:
+            detection.series_title = item_title
         if str(path) in overrides:
             detection.volume = parse_book_override(overrides[str(path)])
             detection.confidence = 100
@@ -224,12 +274,13 @@ def build_novel_plan(folder, title, template, recursive=False, force_sequence=Fa
             detection.reason = '组内排序编号'
             counters[key] = volume + 1
         detections[path] = detection
+        item_titles[path] = item_title
+        group_meta[path] = (key, relative)
 
     plan = []
     for path in paths:
-        key, relative = group_for(path)
-        options = groups.get(key, GroupSettings())
-        item_title = options.title.strip() or title.strip()
+        key, relative = group_meta[path]
+        item_title = item_titles[path]
         detection = detections[path]
         status = READY
         if str(path) in skipped:
@@ -260,12 +311,15 @@ def build_novel_plan(folder, title, template, recursive=False, force_sequence=Fa
             display.append(detection.part)
         if detection.volume_title:
             display.append(detection.volume_title)
-        label = '当前目录' if relative == '.' else relative
+        base_label = '当前目录' if relative == '.' else relative
+        label = item_title if relative == '.' and item_title else (
+            f'{base_label} / {item_title}' if item_title else base_label)
         plan.append(BookRenameItem(
             str(path), str(target), '轻小说', ' · '.join(display) if display else '—',
             detection.confidence, status, group=label, group_id=key,
             reason=detection.reason, signature=_signature(path), mode=mode,
-            volume=detection.volume, volume_title=detection.volume_title, part=detection.part))
+            volume=detection.volume, volume_title=detection.volume_title, part=detection.part,
+            series_title=item_title))
 
     targets = Counter(os.path.normcase(x.new_path) for x in plan if x.status in {READY, '无需修改'})
     candidates = {os.path.normcase(x.old_path) for x in plan if x.status == READY}
@@ -439,6 +493,7 @@ class LightNovelMixin:
             return
         item = self.plan[self.selected_indices()[0]]
         if not hasattr(self, 'content_type_var') or self.content_type_var.get() != '轻小说':
+            # Keep the original test/extension seam: GroupDialog lives in this method's globals.
             dialog = GroupDialog(self, item.group, self.groups.get(item.group_id, GroupSettings()))
             if dialog.result is not None:
                 self.groups[item.group_id] = dialog.result
@@ -452,5 +507,6 @@ class LightNovelMixin:
 
 
 def core_templates():
+    # Late import avoids a dependency cycle with the main UI modules.
     from ui_constants import TEMPLATES
     return TEMPLATES
