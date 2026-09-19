@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -222,22 +222,51 @@ def build_plan(folder, title, season, template, recursive=False, rename_subtitle
         if str(p) in overrides:
             detections[p] = replace(parse_override(overrides[str(p)]), season=originals[p].season)
     videos = [p for p in paths if p.suffix.lower() in VIDEO_EXTS]
+    video_set = set(videos)
+
+    # Subtitle association used to rescan the complete video list for every subtitle,
+    # which made large single-directory libraries approach O(subtitles * videos).
+    # Build directory/name/episode indexes once so each subtitle only performs direct
+    # dictionary lookups plus work proportional to its own file-name length.
+    stems_by_parent = defaultdict(lambda: defaultdict(list))
+    episodes_by_parent = defaultdict(list)
+    episodes_by_parent_season = defaultdict(list)
+    for video in videos:
+        stems_by_parent[video.parent][video.stem.lower()].append(video)
+        det = originals[video]
+        if det.episode is not None:
+            episodes_by_parent[(video.parent, det.episode, det.special)].append(video)
+            episodes_by_parent_season[(video.parent, det.episode, det.special, det.season)].append(video)
+
     associations, ambiguous = {}, set()
     for p in paths:
-        if p in videos:
+        if p in video_set:
             continue
-        local = [v for v in videos if v.parent == p.parent]
-        matches = [v for v in local if p.stem.lower() == v.stem.lower()
-                   or any(p.stem.lower().startswith(v.stem.lower() + sep) for sep in '._-')]
-        if matches:
-            longest = max(len(v.stem) for v in matches)
-            matches = [v for v in matches if len(v.stem) == longest]
-        else:
+
+        subtitle_stem = p.stem.lower()
+        stem_index = stems_by_parent.get(p.parent, {})
+        # Exact video stem or the longest video-stem prefix followed by . _ or -.
+        # Trying candidates longest-first preserves the old longest-match behavior
+        # without scanning every video in the directory.
+        candidates = [subtitle_stem]
+        candidates.extend(subtitle_stem[:i] for i, ch in enumerate(subtitle_stem)
+                          if i and ch in '._-')
+        matches = []
+        for candidate in sorted(set(candidates), key=len, reverse=True):
+            found = stem_index.get(candidate)
+            if found:
+                matches = list(found)
+                break
+
+        if not matches:
             sub = originals[p]
-            matches = [v for v in local if sub.episode is not None
-                       and originals[v].episode == sub.episode
-                       and originals[v].special == sub.special
-                       and (sub.season is None or sub.season == originals[v].season)]
+            if sub.episode is not None:
+                if sub.season is None:
+                    matches = list(episodes_by_parent.get(
+                        (p.parent, sub.episode, sub.special), ()))
+                else:
+                    matches = list(episodes_by_parent_season.get(
+                        (p.parent, sub.episode, sub.special, sub.season), ()))
         if len(matches) == 1:
             associations[p] = matches[0]
         elif len(matches) > 1:
@@ -307,7 +336,7 @@ def build_plan(folder, title, season, template, recursive=False, rename_subtitle
             except ValueError as exc:
                 status = '错误：' + str(exc)
         token = (det.special + (str(det.special_index) if det.special_index is not None else '')) if det.special else str(det.episode)
-        plan.append(RenameItem(str(p), str(target), '视频' if p in videos else '字幕',
+        plan.append(RenameItem(str(p), str(target), '视频' if p in video_set else '字幕',
                                token if det.episode is not None or det.special else '—',
                                det.confidence, status, det.episode, det.special, label,
                                key, det.reason, _signature(p), mode))
