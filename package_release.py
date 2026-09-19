@@ -15,6 +15,13 @@ def package():
         'AnimeRenamer.pyw',
         'renamer_core.py',
         'file_operations.py',
+        'ui_actions.py',
+        'ui_constants.py',
+        'ui_dialogs.py',
+        'ui_layout.py',
+        'ui_styles.py',
+        'ui_theme.py',
+        'ui_view.py',
         'README.md',
         'CHANGELOG.md',
         'LICENSE',
@@ -70,6 +77,9 @@ def package():
         assert prefix + 'assets/yuno_sidebar_hd.png' in z.namelist()
         assert prefix + 'assets/yuno_banner.png' in z.namelist()
         assert prefix + 'LICENSE' in z.namelist()
+        for module in ['ui_actions.py', 'ui_constants.py', 'ui_dialogs.py', 'ui_layout.py',
+                       'ui_styles.py', 'ui_theme.py', 'ui_view.py']:
+            assert prefix + module in z.namelist()
         assert prefix + 'AnimeRenamer.exe' not in z.namelist()
 
     print(archive)
