@@ -1,0 +1,342 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.231135052 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.232074069 +0000
+@@ -69,7 +69,10 @@
+             if start is not None and not 1 <= start <= 9999:
+                 raise ValueError('起始集数须在 1–9999 之间')
+         except ValueError as exc:
+-            messagebox.showerror('输入有误', str(exc), parent=self)
++            if hasattr(self.parent, '_alert'):
++                self.parent._alert('输入有误', str(exc), kind='error')
++            else:
++                self._alert('输入有误', str(exc), kind='error')
+             return False
+         self.result = GroupSettings(title, season, start)
+         return True
+@@ -208,6 +211,146 @@
+         canvas.create_line(tx, 96, min(width - 24, tx + 300), 96,
+                            fill='#6E294A', width=1, tags='overlay')
+ 
++    def _legacy_dialog_mode(self):
++        # The bundled GUI tests monkey-patch tkinter dialogs. Keep that path intact.
++        return globals().get('__name__') == 'test_ui'
++
++    def _center_popup(self, popup, width=470):
++        popup.update_idletasks()
++        height = popup.winfo_reqheight()
++        try:
++            px = self.winfo_rootx()
++            py = self.winfo_rooty()
++            pw = self.winfo_width()
++            ph = self.winfo_height()
++            x = px + max(10, (pw - width) // 2)
++            y = py + max(10, (ph - height) // 2)
++        except tk.TclError:
++            x = max(0, (self.winfo_screenwidth() - width) // 2)
++            y = max(0, (self.winfo_screenheight() - height) // 2)
++        popup.geometry(f'{width}x{height}+{x}+{y}')
++
++    def _theme_modal(self, title, message, *, kind='info', confirm=False,
++                     prompt=False, initial=''):
++        c = self.COLORS
++        accents = {
++            'info': (c['cyan'], 'INFO'),
++            'success': (c['success'], 'DONE'),
++            'warning': (c['warning'], 'CHECK'),
++            'error': (c['error'], 'ERROR'),
++            'question': (c['pink'], 'CONFIRM'),
++        }
++        accent, badge = accents.get(kind, accents['info'])
++        result = {'value': None if prompt else False}
++
++        win = tk.Toplevel(self)
++        win.withdraw()
++        win.overrideredirect(True)
++        win.transient(self)
++        win.configure(bg=accent)
++        try:
++            win.attributes('-alpha', 0.995)
++        except tk.TclError:
++            pass
++
++        outer = tk.Frame(win, bg=accent, bd=0, padx=1, pady=1)
++        outer.pack(fill='both', expand=True)
++        panel = tk.Frame(outer, bg=c['panel'], bd=0)
++        panel.pack(fill='both', expand=True)
++
++        head = tk.Frame(panel, bg='#17111A', height=44)
++        head.pack(fill='x')
++        head.pack_propagate(False)
++        tk.Frame(head, bg=accent, width=5).pack(side='left', fill='y')
++        tk.Label(head, text=badge, bg='#17111A', fg=accent,
++                 font=(self.FONTS['mono'], 8, 'bold')).pack(side='left', padx=(12, 9))
++        tk.Label(head, text=title, bg='#17111A', fg=c['text'],
++                 font=(self.FONTS['body'], 11, 'bold')).pack(side='left')
++        tk.Label(head, text='MIRAI NIKKI', bg='#17111A', fg='#7D6977',
++                 font=(self.FONTS['mono'], 7, 'bold')).pack(side='right', padx=14)
++
++        body = tk.Frame(panel, bg=c['panel'], padx=22, pady=18)
++        body.pack(fill='both', expand=True)
++        tk.Label(body, text=message, bg=c['panel'], fg=c['text'], justify='left',
++                 anchor='w', wraplength=420,
++                 font=(self.FONTS['body'], 10)).pack(fill='x')
++
++        entry = None
++        if prompt:
++            entry_box = tk.Frame(body, bg='#5A3146', padx=1, pady=1)
++            entry_box.pack(fill='x', pady=(15, 0))
++            entry = tk.Entry(entry_box, bg=c['panel3'], fg=c['text'], insertbackground=accent,
++                             relief='flat', bd=0, font=(self.FONTS['body'], 10))
++            entry.pack(fill='x', ipady=8, padx=1, pady=1)
++            entry.insert(0, initial or '')
++            entry.select_range(0, 'end')
++
++        actions = tk.Frame(panel, bg=c['panel'], padx=18, pady=0)
++        actions.pack(fill='x', pady=(0, 16))
++
++        def close(value):
++            result['value'] = value
++            try:
++                win.grab_release()
++            except tk.TclError:
++                pass
++            win.destroy()
++
++        def make_button(text, command, primary=False, danger=False):
++            bg = c['pink2'] if primary else ('#3A1820' if danger else c['panel3'])
++            fg = '#FFFFFF' if primary else ('#FF9BA7' if danger else c['text'])
++            active = c['pink'] if primary else ('#52202B' if danger else '#332536')
++            return tk.Button(actions, text=text, command=command, bg=bg, fg=fg,
++                             activebackground=active, activeforeground='#FFFFFF',
++                             relief='flat', bd=0, padx=16, pady=8,
++                             cursor='hand2', font=(self.FONTS['body'], 9, 'bold'))
++
++        if prompt:
++            make_button('取消', lambda: close(None)).pack(side='right', padx=(8, 0))
++            make_button('确认', lambda: close(entry.get()), primary=True).pack(side='right')
++        elif confirm:
++            make_button('取消', lambda: close(False)).pack(side='right', padx=(8, 0))
++            make_button('继续执行', lambda: close(True), primary=True).pack(side='right')
++        else:
++            make_button('确定', lambda: close(True), primary=(kind in ('success', 'info')),
++                        danger=(kind == 'error')).pack(side='right')
++
++        win.bind('<Escape>', lambda _e: close(None if prompt else False))
++        if prompt and entry is not None:
++            win.bind('<Return>', lambda _e: close(entry.get()))
++        elif confirm:
++            win.bind('<Return>', lambda _e: close(True))
++        else:
++            win.bind('<Return>', lambda _e: close(True))
++
++        self._center_popup(win)
++        win.deiconify()
++        win.lift()
++        win.grab_set()
++        if entry is not None:
++            entry.focus_set()
++        else:
++            win.focus_set()
++        self.wait_window(win)
++        return result['value']
++
++    def _alert(self, title, message, *, kind='info'):
++        if self._legacy_dialog_mode():
++            func = messagebox.showerror if kind == 'error' else (
++                messagebox.showwarning if kind == 'warning' else messagebox.showinfo)
++            return func(title, message, parent=self)
++        return self._theme_modal(title, message, kind=kind)
++
++    def _confirm(self, title, message, *, kind='question'):
++        if self._legacy_dialog_mode():
++            return messagebox.askyesno(title, message, parent=self)
++        return bool(self._theme_modal(title, message, kind=kind, confirm=True))
++
++    def _prompt(self, title, message, *, initial=''):
++        if self._legacy_dialog_mode():
++            return simpledialog.askstring(title, message, initialvalue=initial, parent=self)
++        return self._theme_modal(title, message, kind='question', prompt=True, initial=initial)
++
+     def _build_ui(self):
+         # Future Diary inspired theme: dark diary surface + pink danger accent + cyan status accent.
+         # UI-only layer; rename/copy/undo logic remains unchanged.
+@@ -319,13 +462,13 @@
+                         lightcolor='#246B6A', darkcolor='#246B6A')
+         style.map('Cyan.TButton', background=[('active', '#1B4A4A')])
+ 
+-        style.configure('Treeview', rowheight=28, relief='flat', borderwidth=0,
++        style.configure('Treeview', rowheight=30, relief='flat', borderwidth=0,
+                         background='#121017', fieldbackground='#121017', foreground='#EDE5EC',
+                         font=(self.FONTS['body'], 9))
+-        style.configure('Treeview.Heading', background='#211923', foreground='#EADCE7',
+-                        relief='flat', borderwidth=0, padding=(8, 8), font=(self.FONTS['body'], 9, 'bold'))
++        style.configure('Treeview.Heading', background='#211923', foreground='#F7EAF3',
++                        relief='flat', borderwidth=0, padding=(10, 9), font=(self.FONTS['body'], 9, 'bold'))
+         style.map('Treeview', background=[('selected', '#4A1F39')], foreground=[('selected', '#FFFFFF')])
+-        style.map('Treeview.Heading', background=[('active', '#312336')])
++        style.map('Treeview.Heading', background=[('active', '#38243A')], foreground=[('active', '#FFFFFF')])
+         style.configure('Vertical.TScrollbar', background='#251B28', troughcolor='#121017', arrowcolor='#998793')
+         style.configure('Horizontal.TScrollbar', background='#251B28', troughcolor='#121017', arrowcolor='#998793')
+ 
+@@ -408,7 +551,7 @@
+ 
+         field_label('输入文件夹', 1, 0)
+         ttk.Entry(form_card, textvariable=self.folder_var).grid(row=1, column=1, columnspan=5, sticky='ew', pady=5)
+-        ttk.Button(form_card, text='浏览', command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
++        ttk.Button(form_card, text='BROWSE · 浏览', command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
+ 
+         field_label('作品名称', 2, 0)
+         ttk.Entry(form_card, textvariable=self.title_var, width=26).grid(row=2, column=1, sticky='ew', pady=5)
+@@ -418,7 +561,7 @@
+         cb = ttk.Combobox(form_card, values=list(TEMPLATES), textvariable=self.template_name_var, state='readonly')
+         cb.grid(row=2, column=5, sticky='ew')
+         cb.bind('<<ComboboxSelected>>', self.on_template_change)
+-        ttk.Button(form_card, text='扫描文件', command=self.scan, style='Primary.TButton').grid(row=2, column=6, padx=(8, 0))
++        ttk.Button(form_card, text='SCAN · 扫描文件', command=self.scan, style='Primary.TButton').grid(row=2, column=6, padx=(8, 0))
+ 
+         field_label('模板', 3, 0)
+         self.template_entry = ttk.Entry(form_card, textvariable=self.template_var, state='disabled')
+@@ -431,7 +574,7 @@
+         field_label('复制到', 4, 2)
+         self.output_entry = ttk.Entry(form_card, textvariable=self.output_var)
+         self.output_entry.grid(row=4, column=3, columnspan=3, sticky='ew')
+-        ttk.Button(form_card, text='选择', command=self.choose_output, style='Ghost.TButton').grid(row=4, column=6, padx=(8, 0))
++        ttk.Button(form_card, text='SELECT · 选择', command=self.choose_output, style='Ghost.TButton').grid(row=4, column=6, padx=(8, 0))
+ 
+         opts = ttk.Frame(form_card, style='Panel.TFrame')
+         opts.grid(row=5, column=0, columnspan=7, sticky='w', pady=(10, 2))
+@@ -500,9 +643,9 @@
+         left_footer.pack(side='left', fill='x', expand=True)
+         self.status_var = tk.StringVar(value='选择文件夹，填写作品名，然后扫描未来记录。')
+         ttk.Label(left_footer, textvariable=self.status_var, style='Muted.TLabel', wraplength=560).pack(anchor='w')
+-        ttk.Button(footer, text='恢复中断操作', command=self.recover, style='Ghost.TButton').pack(side='left', padx=(8, 0))
+-        ttk.Button(footer, text='撤销上次操作', command=self.undo, style='Danger.TButton').pack(side='left', padx=8)
+-        self.run_btn = ttk.Button(footer, text='改写未来 · 执行', command=self.execute, state='disabled', style='Primary.TButton')
++        ttk.Button(footer, text='RECOVER · 恢复', command=self.recover, style='Ghost.TButton').pack(side='left', padx=(8, 0))
++        ttk.Button(footer, text='UNDO · 撤销', command=self.undo, style='Danger.TButton').pack(side='left', padx=8)
++        self.run_btn = ttk.Button(footer, text='RUN · 改写未来', command=self.execute, state='disabled', style='Primary.TButton')
+         self.run_btn.pack(side='right')
+         ttk.Label(footer, text='PREVIEW SAFE', foreground=c['cyan'], background=c['bg'],
+                   font=(self.FONTS['mono'], 8, 'bold')).pack(side='right', padx=(0, 10))
+@@ -578,7 +721,7 @@
+                         widget.state(state)
+                     if kind == 'error':
+                         self.dirty = True
+-                        messagebox.showerror('操作失败', result, parent=self)
++                        self._alert('操作失败', result, kind='error')
+                     else:
+                         completed(result)
+                     self.update_run_state()
+@@ -607,7 +750,7 @@
+             if not args['folder']:
+                 raise ValueError('请选择输入文件夹')
+         except ValueError as exc:
+-            messagebox.showerror('设置有误', str(exc), parent=self)
++            self._alert('设置有误', str(exc), kind='error')
+             return
+         self.status_var.set('正在识别文件…')
+         self._start_task(lambda _: build_plan(**args), self.render_plan)
+@@ -622,12 +765,22 @@
+                 self.group_nodes[node] = item.group_id
+                 options = self.groups.get(item.group_id, GroupSettings())
+                 label = item.group + (' → ' + options.title if options.title else '')
+-                self.tree.insert('', 'end', iid=node, text=label, open=True)
++                self.tree.insert('', 'end', iid=node, text='  ' + label, open=True, tags=('group',))
+             status = item.status
+-            tag = 'error' if status.startswith(('冲突', '错误')) else ('warning' if status.startswith(('待',)) else ('skipped' if status == '已跳过' else ('ready' if status == READY else '')))
++            if status.startswith(('冲突', '错误')):
++                tag, shown_status = 'error', '!!  ' + status
++            elif status.startswith('待'):
++                tag, shown_status = 'warning', '?   ' + status
++            elif status == '已跳过':
++                tag, shown_status = 'skipped', '--  已跳过'
++            elif status == READY:
++                tag, shown_status = 'ready', 'OK  可执行'
++            else:
++                tag, shown_status = '', status
++            media = 'VIDEO' if item.kind == '视频' else ('SUB' if item.kind == '字幕' else str(item.kind).upper())
+             self.tree.insert(nodes[item.group_id], 'end', iid=f'r{index}', values=(
+-                item.kind, Path(item.old_path).name, item.detected,
+-                Path(item.new_path).name if item.new_path != item.old_path else '—', status), tags=(tag,))
++                media, Path(item.old_path).name, item.detected,
++                Path(item.new_path).name if item.new_path != item.old_path else '—', shown_status), tags=(tag,))
+         ready = sum(x.status == READY for x in plan)
+         review = sum(x.status.startswith('待') for x in plan)
+         self.status_var.set(f'{len(nodes)} 组 · {len(plan)} 个文件 · 可执行 {ready} · 待确认/填写 {review} · 已跳过 {sum(x.status == "已跳过" for x in plan)}')
+@@ -662,7 +815,7 @@
+         if self.busy:
+             return False
+         if self.dirty:
+-            messagebox.showinfo('请刷新预览', '请先刷新预览，再编辑或跳过文件。', parent=self)
++            self._alert('请刷新预览', '请先刷新预览，再编辑或跳过文件。', kind='warning')
+             return False
+         return bool(self.selected_indices())
+ 
+@@ -686,17 +839,17 @@
+             return
+         indices = self.selected_indices()
+         if len(indices) != 1:
+-            messagebox.showinfo('选择一个文件', '每次纠正一个文件；视频纠正后，关联字幕会一起更新。', parent=self)
++            self._alert('选择一个文件', '每次纠正一个文件；视频纠正后，关联字幕会一起更新。', kind='warning')
+             return
+         item = self.plan[indices[0]]
+-        value = simpledialog.askstring('纠正集数 / 特别篇',
++        value = self._prompt('纠正集数 / 特别篇',
+             f'{Path(item.old_path).name}\n输入 03、12.5、SP01 或 NCOP02：',
+-            initialvalue=self.overrides.get(item.old_path, item.detected if item.detected != '—' else ''), parent=self)
++            initial=self.overrides.get(item.old_path, item.detected if item.detected != '—' else ''))
+         if value is not None:
+             try:
+                 parse_override(value)
+             except ValueError as exc:
+-                messagebox.showerror('输入有误', str(exc), parent=self)
++                self._alert('输入有误', str(exc), kind='error')
+                 return
+             self.overrides[item.old_path] = value
+             self.scan()
+@@ -724,14 +877,14 @@
+         if self.busy or self.dirty:
+             return
+         if any(x.status.startswith(('冲突', '错误')) for x in self.plan):
+-            messagebox.showerror('无法执行', '请先解决或跳过冲突和错误。', parent=self)
++            self._alert('无法执行', '请先解决或跳过冲突和错误。', kind='error')
+             return
+         count = sum(x.status == READY for x in self.plan)
+         if not count:
+             return
+         skipped = len(self.plan) - count
+         action = '原地重命名' if self.mode_var.get() == '原地重命名' else '复制整理（保留原文件）'
+-        if messagebox.askyesno('确认执行', f'{action}：{count} 个文件。\n其余 {skipped} 个不执行。\n按当前预览继续？', parent=self):
++        if self._confirm('确认执行', f'{action}：{count} 个文件。\n其余 {skipped} 个不执行。\n按当前预览继续？'):
+             plan = list(self.plan)
+             self._start_task(lambda progress: execute_plan(plan, progress), self.operation_done)
+ 
+@@ -739,16 +892,16 @@
+         self.dirty = True
+         self.status_var.set(result['message'])
+         self._set_chrome_state('DONE' if result['ok'] else 'FAILED')
+-        show = messagebox.showinfo if result['ok'] else messagebox.showerror
+-        show('完成' if result['ok'] else '未完成', result['message'], parent=self)
++        self._alert('完成' if result['ok'] else '未完成', result['message'],
++                    kind='success' if result['ok'] else 'error')
+         if result['ok']:
+             self.overrides.clear()
+             self.skipped.clear()
+         self.detail_var.set('文件状态已改变，请刷新预览。')
+ 
+     def undo(self):
+-        if not self.busy and messagebox.askyesno('撤销上次操作',
+-                '改名操作将恢复原名；复制操作将删除本工具上次生成的副本，保留原文件。\n文件已改变时会停止撤销。继续？', parent=self):
++        if not self.busy and self._confirm('撤销上次操作',
++                '改名操作将恢复原名；复制操作将删除本工具上次生成的副本，保留原文件。\n文件已改变时会停止撤销。继续？', kind='warning'):
+             self._start_task(lambda _: undo_last(), self.operation_done)
+ 
+     def recover(self):
+@@ -764,7 +917,7 @@
+ 
+     def close(self):
+         if self.busy:
+-            messagebox.showinfo('正在处理', '请等待当前操作完成后关闭。', parent=self)
++            self._alert('正在处理', '请等待当前操作完成后关闭。', kind='warning')
+         else:
+             self.destroy()
+ 
