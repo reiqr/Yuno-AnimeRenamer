@@ -15,13 +15,6 @@ def package():
         'AnimeRenamer.pyw',
         'renamer_core.py',
         'file_operations.py',
-        'ui_actions.py',
-        'ui_constants.py',
-        'ui_dialogs.py',
-        'ui_layout.py',
-        'ui_styles.py',
-        'ui_theme.py',
-        'ui_view.py',
         'README.md',
         'CHANGELOG.md',
         'LICENSE',
@@ -35,6 +28,11 @@ def package():
         source = root / name
         if source.is_file():
             files.append((source, name))
+
+    # UI was split into small ui_*.py modules. Discover them automatically so future
+    # UI refactors do not require maintaining a second hard-coded release list.
+    ui_modules = sorted(root.glob('ui_*.py'))
+    files += [(module, module.name) for module in ui_modules]
 
     # Keep legacy launch/build helpers when they are present, but do not require them.
     for name in ['运行 AnimeRenamer.bat', '生成EXE.bat', 'run_app.bat']:
@@ -70,17 +68,17 @@ def package():
             z.write(source, prefix + name)
 
     with zipfile.ZipFile(archive) as z:
+        names_in_zip = set(z.namelist())
         assert z.testzip() is None
-        assert prefix + 'assets/app_icon.ico' in z.namelist()
-        assert prefix + 'assets/app_icon.png' in z.namelist()
-        assert prefix + 'assets/yuno_sidebar.png' in z.namelist()
-        assert prefix + 'assets/yuno_sidebar_hd.png' in z.namelist()
-        assert prefix + 'assets/yuno_banner.png' in z.namelist()
-        assert prefix + 'LICENSE' in z.namelist()
-        for module in ['ui_actions.py', 'ui_constants.py', 'ui_dialogs.py', 'ui_layout.py',
-                       'ui_styles.py', 'ui_theme.py', 'ui_view.py']:
-            assert prefix + module in z.namelist()
-        assert prefix + 'AnimeRenamer.exe' not in z.namelist()
+        assert prefix + 'assets/app_icon.ico' in names_in_zip
+        assert prefix + 'assets/app_icon.png' in names_in_zip
+        assert prefix + 'assets/yuno_sidebar.png' in names_in_zip
+        assert prefix + 'assets/yuno_sidebar_hd.png' in names_in_zip
+        assert prefix + 'assets/yuno_banner.png' in names_in_zip
+        assert prefix + 'LICENSE' in names_in_zip
+        for module in ui_modules:
+            assert prefix + module.name in names_in_zip
+        assert prefix + 'AnimeRenamer.exe' not in names_in_zip
 
     print(archive)
     return archive
