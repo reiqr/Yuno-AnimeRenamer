@@ -77,7 +77,8 @@ jobs:
         run: |
           python -m PyInstaller --noconfirm --clean --onefile --windowed --noupx `
             --name AnimeRenamer_FutureDiary `
-            --version-file "$PWD\windows_version_info.txt" `
+            --paths "$PWD\ui" `
+            --version-file "$PWD\tools\windows_version_info.txt" `
             --icon "$PWD\assets\app_icon.ico" `
             --add-data "$PWD\assets;assets" `
             --distpath "$PWD\dist" `
@@ -88,7 +89,7 @@ jobs:
           }
 
       - name: Create release ZIP
-        run: python package_release.py
+        run: python tools/package_release.py
 
       - name: Generate SHA256 checksums
         shell: pwsh
