@@ -35,10 +35,14 @@ class ViewMixin:
         """Fill the preview viewport exactly while respecting useful minimums."""
         if not hasattr(self, 'tree'):
             return
-        specs = [
-            ('#0', 0.12, 80), ('kind', 0.06, 46), ('old', 0.29, 155),
-            ('detected', 0.10, 72), ('new', 0.29, 155), ('status', 0.14, 95),
-        ]
+        novel = hasattr(self, 'content_type_var') and self.content_type_var.get() == '轻小说'
+        specs = (
+            [('#0', 0.12, 80), ('kind', 0.06, 46), ('old', 0.27, 150),
+             ('detected', 0.15, 126), ('new', 0.27, 150), ('status', 0.13, 95)]
+            if novel else
+            [('#0', 0.12, 80), ('kind', 0.06, 46), ('old', 0.29, 155),
+             ('detected', 0.10, 72), ('new', 0.29, 155), ('status', 0.14, 95)]
+        )
         minimum_total = sum(minimum for _col, _ratio, minimum in specs)
         width = max(minimum_total, self.tree.winfo_width() - 2)
         widths = {col: max(minimum, int(width * ratio))

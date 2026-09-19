@@ -9,7 +9,7 @@ from pathlib import Path
 
 from file_operations import execute_plan, undo_last, recover_pending, pending_operation
 
-VERSION = '0.3.1'
+VERSION = '0.3.2'
 VIDEO_EXTS = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.m4v', '.ts', '.m2ts', '.webm'}
 SUB_EXTS = {'.ass', '.ssa', '.srt', '.vtt', '.sup', '.sub', '.idx'}
 LANG_TAGS = ['zh-hans', 'zh-hant', 'zh-cn', 'zh-tw', 'chs', 'cht', 'sc', 'tc',

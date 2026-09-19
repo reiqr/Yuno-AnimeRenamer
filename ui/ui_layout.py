@@ -315,8 +315,12 @@ class LayoutMixin:
                 'disabled_bg': '#17141A', 'disabled_fg': '#6E636B',
             }, font=(self.FONTS['body'], 8, 'bold'))
         self.preview_problem_toggle.pack(side='left', padx=(0, 7))
-        ttk.Button(preview_filters, text='全选当前', command=self.select_visible_rows,
-                   style='Ghost.TButton').pack(side='left')
+        self.preview_select_visible_btn = tk.Button(
+            preview_filters, text='全选当前', command=self.select_visible_rows,
+            bg='#1B1620', fg='#B7A9B3', activebackground='#352031', activeforeground='#FFF3F8',
+            relief='flat', bd=0, highlightthickness=1, highlightbackground='#493544',
+            padx=10, pady=4, cursor='hand2', font=(self.FONTS['body'], 8, 'bold'))
+        self.preview_select_visible_btn.pack(side='left')
         self.preview_visible_var = tk.StringVar(value='SHOW 0 / 0')
         ttk.Label(preview_filters, textvariable=self.preview_visible_var, style='MutedPanel.TLabel',
                   font=(self.FONTS['mono'], 8)).pack(side='right')

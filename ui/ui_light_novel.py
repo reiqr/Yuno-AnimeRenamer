@@ -440,6 +440,7 @@ class LightNovelMixin:
             language.pack(side='left', padx=(0, 8), before=sequence)
             self.tree.heading('#0', text='GROUP')
             self.tree.heading('detected', text='MATCH')
+        self.after_idle(self._resize_tree_columns)
 
     def _novel_mode_dirty(self, *_):
         self.groups.clear()

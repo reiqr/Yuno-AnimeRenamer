@@ -14,9 +14,13 @@ if not defined DEFAULT_VERSION goto :version_read_error
 echo.
 echo Current project version: %DEFAULT_VERSION%
 set "PRODUCT_VERSION="
-echo Enter another x.y.z only for a temporary build override; source VERSION will not change.
+echo Enter a newer x.y.z once to make it the new project default.
+echo Older versions remain one-time build overrides and will not roll the project back.
 set /p "PRODUCT_VERSION=Release version [Enter = %DEFAULT_VERSION%]: "
 if not defined PRODUCT_VERSION set "PRODUCT_VERSION=%DEFAULT_VERSION%"
+
+%PY% tools\generate_version_info.py --product-version "%PRODUCT_VERSION%" --remember-product-version
+if errorlevel 1 goto :bad_version
 
 set "BUILD_NO="
 for /f %%I in ('git rev-list --count HEAD 2^>nul') do set "BUILD_NO=%%I"

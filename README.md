@@ -1,10 +1,10 @@
-# AnimeRenamer 0.3.1
+# AnimeRenamer 0.3.2
 
 Windows 离线番剧、字幕与轻小说文件整理工具。先扫描并检查预览，再执行原地重命名或复制整理。无需账号、API 密钥或网络服务。
 
 ## 启动
 
-- 已打包版本：双击 `AnimeRenamer_FutureDiary_v<产品版本>.<构建号>.exe`，例如 `AnimeRenamer_FutureDiary_v0.3.1.57.exe`，无需安装 Python。
+- 已打包版本：双击 `AnimeRenamer_FutureDiary_v<产品版本>.<构建号>.exe`，例如 `AnimeRenamer_FutureDiary_v0.3.2.57.exe`，无需安装 Python。
 - 源码版本：安装 Python 3.10+，双击 `run_app.bat`，或运行 `python AnimeRenamer.pyw`。程序运行只使用 Python 标准库。
 - 兼容入口：旧中文名脚本 `运行 AnimeRenamer.bat` 与 `生成EXE.bat` 仍然保留可用；新用户建议使用英文名脚本。若旧构建脚本与当前说明不一致，以 `build_exe.bat` 为准。
 - 源码与后续 Git 历史固定保存在 `AnimeRenamer` 目录；旁边的旧版本目录和 ZIP 可作为原始交付备份保留。
@@ -146,24 +146,24 @@ python -m pip install pyinstaller
 随后双击 `build_exe.bat`。EXE 文件名会直接包含完整构建版本，例如：
 
 ```text
-dist\AnimeRenamer_FutureDiary_v0.3.1.57.exe
+dist\AnimeRenamer_FutureDiary_v0.3.2.57.exe
 ```
 
 构建前会由 `tools/generate_version_info.py` 自动生成 Windows 版本信息：
 
-- `ProductVersion` 直接读取 `renamer_core.VERSION`，仍是项目发布版本，例如 `0.3.1`；
-- `FileVersion` 追加自动构建号，例如 `0.3.1.57`；
+- `ProductVersion` 直接读取 `renamer_core.VERSION`，仍是项目发布版本，例如 `0.3.2`；
+- `FileVersion` 追加自动构建号，例如 `0.3.2.57`；
 - EXE 文件名使用与 `FileVersion` 相同的完整版本号；
 - GitHub Actions 使用源码中的 `renamer_core.VERSION` 作为产品版本，并使用 `github.run_number` 作为构建号；
-- 本地 `build_exe.bat` 会显示当前项目版本；直接回车使用 `renamer_core.VERSION`（当前为 `0.3.1`）；
-- 也可输入其他三段版本号做一次性临时构建覆盖；该输入不会自动修改源码版本；
+- 本地 `build_exe.bat` 会显示当前项目版本；直接回车使用 `renamer_core.VERSION`（当前为 `0.3.2`）；
+- 输入更高的三段版本号后会自动写回 `renamer_core.VERSION`，下次构建直接回车即可沿用；输入更低版本只作为本次临时构建，不会让项目版本倒退；
 - 构建号仍自动使用当前 Git 提交数量；若源码不在 Git 仓库中则使用 `0`；
-- 因此输入 `0.3.1` 后，若当前自动构建号为 `58`，会生成 `AnimeRenamer_FutureDiary_v0.3.1.58.exe`，其 `ProductVersion` 为 `0.3.1`、`FileVersion` 为 `0.3.1.58`；
+- 因此首次输入 `0.3.2` 后，若当前自动构建号为 `58`，会生成 `AnimeRenamer_FutureDiary_v0.3.2.58.exe`，之后再次打开构建脚本默认版本也会是 `0.3.2`；
 - 版本化 EXE 启动时会从自身文件名读取产品版本，所以标题栏和左下角版本显示也会与本次构建版本一致；源码直接运行时仍使用 `renamer_core.VERSION`。
 
-本地手工版本只影响本次 EXE 构建，不会自动改写 `renamer_core.py`。正式发布时如需永久升级项目版本，仍建议同步更新 `renamer_core.VERSION`。仓库中的旧 `tools/windows_version_info.txt` 仅保留为历史兼容参考，正式构建和发布包不再依赖它。
+本地手工输入的更高版本会成为新的项目默认版本并写回 `renamer_core.py`；相同或更低版本不会覆盖当前较新的项目版本。仓库中的旧 `tools/windows_version_info.txt` 仅保留为历史兼容参考，正式构建和发布包不再依赖它。
 
-构建脚本会使用 `assets\app_icon.ico` 作为 Windows EXE 图标，并把 `assets/` 一并打包。脚本只清理 `build/`、生成的 `.spec` 和**当前同版本目标 EXE**，不会清空整个 `dist/` 目录，也不会删除其他旧版本 EXE 或发布 ZIP。
+构建脚本会使用 `assets\app_icon.ico` 作为 Windows EXE 图标，并只把运行时实际使用的主题 PNG 显式打包。脚本只清理 `build/`、生成的 `.spec` 和**当前同版本目标 EXE**，不会清空整个 `dist/` 目录，也不会删除其他旧版本 EXE 或发布 ZIP。
 
 运行测试：
 

@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 from renamer_core import VERSION
 
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+_SOURCE_VERSION_RE = re.compile(r"(?m)^(VERSION\s*=\s*[\'\"])(\d+\.\d+\.\d+)([\'\"]\s*)$")
 EXE_PREFIX = "AnimeRenamer_FutureDiary"
 
 
@@ -32,6 +33,23 @@ def parse_product_version(version: str = VERSION) -> tuple[int, int, int]:
         raise ValueError("Windows 版本号每一段必须位于 0–65535")
     return parts
 
+
+
+def remember_product_version(version: str, source_path: str | Path | None = None) -> str:
+    """Persist only a newer x.y.z as the project default; never roll VERSION backward."""
+    candidate = parse_product_version(version)
+    source = Path(source_path) if source_path is not None else ROOT / "renamer_core.py"
+    text = source.read_text(encoding="utf-8")
+    match = _SOURCE_VERSION_RE.search(text)
+    if not match:
+        raise ValueError("无法在 renamer_core.py 中定位 VERSION")
+    current = match.group(2)
+    current_parts = parse_product_version(current)
+    if candidate <= current_parts:
+        return current
+    updated = text[:match.start(2)] + version.strip() + text[match.end(2):]
+    source.write_text(updated, encoding="utf-8")
+    return version.strip()
 
 def _git_commit_count() -> int | None:
     try:
@@ -125,11 +143,19 @@ def main() -> int:
     parser.add_argument("--build", type=int, default=None)
     parser.add_argument("--product-version", default=VERSION)
     parser.add_argument("--print-exe-basename", action="store_true")
+    parser.add_argument("--remember-product-version", action="store_true")
     args = parser.parse_args()
     try:
-        build_number = resolve_build_number(args.build)
         version = args.product_version.strip()
         parse_product_version(version)
+        if args.remember_product_version:
+            remembered = remember_product_version(version)
+            if remembered == version:
+                print(f"Project version remembered: {remembered}")
+            else:
+                print(f"Project version remains: {remembered}; build override: {version}")
+            return 0
+        build_number = resolve_build_number(args.build)
         if args.print_exe_basename:
             print(exe_basename(build_number, version))
         else:

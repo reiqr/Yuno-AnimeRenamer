@@ -75,6 +75,15 @@ class VersionInfoTests(unittest.TestCase):
         with patch.dict(os.environ, {'GITHUB_RUN_NUMBER': '88'}, clear=False):
             self.assertEqual(version_info.resolve_build_number(), 88)
 
+    def test_remember_product_version_only_moves_forward(self):
+        with tempfile.TemporaryDirectory(prefix='anime_version_memory_') as td:
+            source = Path(td) / 'renamer_core.py'
+            source.write_text("VERSION = '0.3.1'\n", encoding='utf-8')
+            self.assertEqual(version_info.remember_product_version('0.3.2', source), '0.3.2')
+            self.assertIn("VERSION = '0.3.2'", source.read_text(encoding='utf-8'))
+            self.assertEqual(version_info.remember_product_version('0.3.1', source), '0.3.2')
+            self.assertIn("VERSION = '0.3.2'", source.read_text(encoding='utf-8'))
+
 
 class UiDisplayGuardTests(unittest.TestCase):
     def test_dpi_awareness_is_enabled_before_tk_import(self):
@@ -117,8 +126,11 @@ class UiDisplayGuardTests(unittest.TestCase):
         self.assertNotIn('tkinterdnd', actions.casefold())
         self.assertIn("self.preview_filter_var = tk.StringVar(value='全部')", layout)
         self.assertIn("text='只看问题'", layout)
+        self.assertIn('self.preview_select_visible_btn = tk.Button', layout)
+        self.assertIn("padx=10, pady=4", layout)
         self.assertIn('command=self.select_visible_rows', layout)
         self.assertIn("text='跳过/恢复'", layout)
+        self.assertIn("('detected', 0.15, 126)", (root / 'ui' / 'ui_view.py').read_text(encoding='utf-8'))
 
     def test_exe_builds_bundle_only_explicit_runtime_assets(self):
         root = Path(__file__).resolve().parents[1]
