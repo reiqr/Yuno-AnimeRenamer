@@ -404,7 +404,7 @@ class LightNovelMixin:
             side='left', padx=(0, 6))
         self.content_type_combo = ttk.Combobox(
             self.content_type_frame, values=['番剧', '轻小说'], textvariable=self.content_type_var,
-            state='readonly', width=9)
+            state='readonly', width=6)
         self.content_type_combo.pack(side='left')
         self.content_type_combo.bind('<<ComboboxSelected>>', self.on_content_type_change)
         self._template_combo = self._find_template_combo()

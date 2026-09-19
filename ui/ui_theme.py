@@ -208,18 +208,21 @@ class ThemeMixin:
         width = max(canvas.winfo_width(), 720)
         variant = getattr(self, '_banner_variant', 'dark')
         if variant == 'bright':
+            # Ready/success states use the dedicated bright material with only a light
+            # readability veil behind the right-side copy.
             banner = getattr(self, 'banner_bright_photo_wide', None) if width >= 840 else getattr(self, 'banner_bright_photo', None)
             veil_fill, veil_stipple = '#150B13', 'gray25'
         else:
+            # Waiting/dirty/review/error states use the dedicated dark material.  The
+            # additional veil is intentionally stronger so a dark state can never read
+            # as the bright banner even when the two source images are close in exposure.
             banner = getattr(self, 'banner_dark_photo_wide', None) if width >= 840 else getattr(self, 'banner_dark_photo', None)
-            veil_fill, veil_stipple = '#09070B', 'gray50'
+            veil_fill, veil_stipple = '#050406', 'gray75'
         if banner:
             canvas.create_image(0, 0, image=banner, anchor='nw', tags='overlay')
         height = max(82, canvas.winfo_height())
-        # Dark states deliberately mute the complete artwork. This makes WAITING / dirty /
-        # review / conflict visually distinct instead of looking like the ready-state banner.
         if variant == 'dark':
-            canvas.create_rectangle(0, 0, width, height, fill='#09070B', stipple='gray50',
+            canvas.create_rectangle(0, 0, width, height, fill='#050406', stipple='gray50',
                                     outline='', tags='overlay')
         # Keep an additional readability veil behind the right-side title copy.
         canvas.create_rectangle(max(420, int(width * 0.52)), 0, width, height,

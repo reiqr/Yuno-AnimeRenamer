@@ -22,7 +22,7 @@ class LayoutMixin:
         side_rail.pack(side='left', fill='y')
         side_rail.create_line(0, 0, 0, 10000, fill='#7A2B52', width=1)
         side_rail.create_line(1, 0, 1, 10000, fill='#24575A', width=1)
-        main = ttk.Frame(shell, style='App.TFrame', padding=(13, 9, 13, 9))
+        main = ttk.Frame(shell, style='App.TFrame', padding=(13, 3, 13, 9))
         main.pack(side='left', fill='both', expand=True)
 
         # Sidebar artwork is pre-rendered at its exact display size from a high-resolution
@@ -320,7 +320,10 @@ class LayoutMixin:
 
         # Empty state uses a deliberately small phone illustration: enough theme, no visual takeover.
         self.empty_state = tk.Frame(preview, bg='#121017', bd=0, highlightthickness=0)
-        self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=318, height=104)
+        self.empty_state_width = 390
+        self.empty_state_height = 116
+        self.empty_state.place(relx=0.5, rely=0.53, anchor='center',
+                               width=self.empty_state_width, height=self.empty_state_height)
         self.empty_phone_photo = self._load_photo('empty_phone.png')
         if self.empty_phone_photo:
             empty_visual = tk.Label(self.empty_state, image=self.empty_phone_photo, bg='#121017',
@@ -336,7 +339,7 @@ class LayoutMixin:
             empty_canvas.create_line(17, 59, 35, 59, fill='#38D6D0', width=1)
             empty_canvas.create_oval(23, 65, 29, 71, outline='#715C69', width=1)
         empty_text = tk.Frame(self.empty_state, bg='#121017')
-        empty_text.pack(side='left', fill='both', expand=True, pady=(13, 8), padx=(0, 8))
+        empty_text.pack(side='left', fill='both', expand=True, pady=(11, 8), padx=(0, 10))
         self.empty_title_var = tk.StringVar(value='尚未读取未来')
         self.empty_sub_var = tk.StringVar(value='选择文件夹并扫描后，重命名预览会显示在这里。')
         tk.Label(empty_text, textvariable=self.empty_title_var, bg='#121017', fg='#EADFE7',
@@ -344,7 +347,7 @@ class LayoutMixin:
         tk.Label(empty_text, text='WAITING FOR DIARY DATA', bg='#121017', fg='#6FCBC5',
                  font=(self.FONTS['mono'], 7, 'bold'), anchor='w').pack(fill='x', pady=(2, 6))
         tk.Label(empty_text, textvariable=self.empty_sub_var, bg='#121017', fg='#887D85',
-                 wraplength=220, justify='left', anchor='w', font=(self.FONTS['body'], 8)).pack(fill='x')
+                 wraplength=300, justify='left', anchor='w', font=(self.FONTS['body'], 8)).pack(fill='x')
 
         for variable in [self.folder_var, self.title_var, self.season_var, self.template_name_var, self.template_var,
                          self.mode_var, self.output_var, self.recursive_var, self.sub_var,

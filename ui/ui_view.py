@@ -104,7 +104,9 @@ class ViewMixin:
         if subtitle is not None:
             self.empty_sub_var.set(subtitle)
         if visible:
-            self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=318, height=104)
+            width = getattr(self, 'empty_state_width', 390)
+            height = getattr(self, 'empty_state_height', 116)
+            self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=width, height=height)
             self.empty_state.lift()
         else:
             self.empty_state.place_forget()
