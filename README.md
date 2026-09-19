@@ -15,7 +15,7 @@ Windows 离线番剧、字幕与轻小说文件整理工具。先扫描并检查
 - `renamer_core.py` / `file_operations.py`：番剧识别与文件操作核心。
 - `ui/`：主界面、主题、弹窗、轻小说模式等 UI 模块。
 - `assets/`：程序实际使用的图片和图标素材。
-- `tools/`：发布打包、Windows 版本信息、图标缓存维护工具。
+- `tools/`：发布打包、Windows 版本信息生成、图标缓存维护工具。
 - `tests/`：回归测试。
 - `benchmarks/`：性能基准。
 - `history/`：历史 Preview 资料。
@@ -149,6 +149,15 @@ python -m pip install pyinstaller
 dist\AnimeRenamer_FutureDiary.exe
 ```
 
+构建前会由 `tools/generate_version_info.py` 自动生成 Windows 版本信息：
+
+- `ProductVersion` 直接读取 `renamer_core.VERSION`，仍是项目发布版本，例如 `0.3.0`；
+- `FileVersion` 追加自动构建号，例如 `0.3.0.57`；
+- GitHub Actions 使用 `github.run_number` 作为构建号；
+- 本地 `build_exe.bat` 使用当前 Git 提交数量作为构建号；若源码不在 Git 仓库中则使用 `0`。
+
+因此每次 CI 新构建都可从 EXE 属性中区分，同时产品版本仍只维护一个来源。仓库中的旧 `tools/windows_version_info.txt` 仅保留为历史兼容参考，正式构建和发布包不再依赖它。
+
 构建脚本会使用 `assets\app_icon.ico` 作为 Windows EXE 图标，并把 `assets/` 一并打包。脚本只清理 `build/`、生成的 `.spec` 和同名目标 EXE，**不会清空整个 `dist/` 目录**，因此不会删除其中其他发布 ZIP 或文件。
 
 运行测试：
@@ -188,9 +197,10 @@ python tools/package_release.py
 
 ## Future Diary UI 当前构建说明
 
-- 在 Tk 创建首个窗口前启用 Windows DPI 感知，降低 Windows 位图缩放导致的模糊。
-- 侧边栏角色图以安全的头部与发丝留白显示，高分辨率派生源保留在 `assets/yuno_sidebar_hd.png`。
+- 在导入 Tkinter、创建首个窗口之前启用 Windows Per-Monitor DPI 感知，避免系统对整个 Tk 窗口做位图拉伸造成模糊。
+- UI 字体只从系统已安装字体中选择；中文优先 `Microsoft YaHei UI`，拉丁标题优先 `Bahnschrift / Segoe UI`，日文优先 `Yu Gothic UI`，等宽标签优先 `Cascadia Mono / Consolas`。显式字号保持在紧凑可读区间，不捆绑字体文件。
+- 发布脚本会拒绝将 `.ttf/.otf/.ttc/.woff/.woff2` 等字体文件打入发布包，避免字体授权与体积问题。
+- 侧边栏角色图以安全的头部与发丝留白显示，高分辨率派生源保留在 `assets/yuno_sidebar_hd.png`；运行时使用原生 Tk 图像资源，不对整个窗口做低分辨率截图式缩放。
 - 打包 EXE 输出为 `dist/AnimeRenamer_FutureDiary.exe`，避免资源管理器继续复用旧 `AnimeRenamer.exe` 的图标缓存。
 - `build_exe.bat` 每次构建前只清理 `build/`、生成的 `.spec` 和同名目标 EXE，不删除 `dist/` 中其他文件，也不会自动安装或升级依赖。
 - 若资源管理器仍显示旧图标，可运行一次 `tools/refresh_icon_cache.bat` 后重新打开文件夹。
-- 界面字体只使用系统已安装字体，不随项目打包任何字体文件。

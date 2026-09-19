@@ -17,6 +17,8 @@ if str(ROOT) not in sys.path:
 
 from renamer_core import VERSION
 
+FONT_SUFFIXES = {'.ttf', '.otf', '.ttc', '.woff', '.woff2'}
+
 
 def package():
     root = _repo_root()
@@ -46,10 +48,15 @@ def package():
     if tools_dir.is_dir():
         files += [(p, p.relative_to(root).as_posix())
                   for p in sorted(tools_dir.iterdir())
-                  if p.is_file() and p.name != '__pycache__']
+                  if p.is_file() and p.name not in {'__pycache__', 'windows_version_info.txt'}]
 
     assets = root / 'assets'
     if assets.is_dir():
+        font_assets = [p for p in assets.rglob('*')
+                       if p.is_file() and p.suffix.lower() in FONT_SUFFIXES]
+        if font_assets:
+            names = ', '.join(p.relative_to(root).as_posix() for p in font_assets)
+            raise RuntimeError(f'发布包禁止包含字体文件：{names}')
         files += [(p, p.relative_to(root).as_posix())
                   for p in sorted(assets.rglob('*')) if p.is_file()]
 
@@ -88,6 +95,7 @@ def package():
             for module in ui_dir.glob('*.py'):
                 assert prefix + module.relative_to(root).as_posix() in names
         assert prefix + 'AnimeRenamer.exe' not in names
+        assert not any(Path(name).suffix.lower() in FONT_SUFFIXES for name in names)
 
     print(archive)
     return archive

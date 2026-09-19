@@ -30,6 +30,13 @@ if errorlevel 1 (
   goto :fail
 )
 
+set "BUILD_NO="
+for /f %%I in ('git rev-list --count HEAD 2^>nul') do set "BUILD_NO=%%I"
+if not defined BUILD_NO set "BUILD_NO=0"
+
+%PY% tools\generate_version_info.py --output build\windows_version_info.txt --build %BUILD_NO%
+if errorlevel 1 goto :fail
+
 if not exist dist mkdir dist
 rem Remove only this build target so unrelated release ZIPs/files in dist are preserved.
 if exist "dist\AnimeRenamer_FutureDiary.exe" del /q "dist\AnimeRenamer_FutureDiary.exe"
@@ -37,7 +44,7 @@ if exist "dist\AnimeRenamer_FutureDiary.exe" del /q "dist\AnimeRenamer_FutureDia
 %PY% -m PyInstaller --noconfirm --clean --onefile --windowed --noupx ^
   --name AnimeRenamer_FutureDiary ^
   --paths "%CD%\ui" ^
-  --version-file "%CD%\tools\windows_version_info.txt" ^
+  --version-file "%CD%\build\windows_version_info.txt" ^
   --icon "%CD%\assets\app_icon.ico" ^
   --add-data "%CD%\assets;assets" ^
   --distpath "%CD%\dist" ^
@@ -48,9 +55,10 @@ if errorlevel 1 goto :fail
 echo.
 echo Build complete:
 echo   dist\AnimeRenamer_FutureDiary.exe
+echo   FileVersion uses the current Git commit count as its build number.
 echo.
 echo Existing unrelated files in dist were preserved.
-echo If Explorer still shows an old icon, run tools\refresh_icon_cache.bat once.
+echo If Explorer still shows an old icon or version, run tools\refresh_icon_cache.bat once.
 echo.
 pause
 exit /b 0
