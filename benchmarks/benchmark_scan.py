@@ -1,8 +1,13 @@
 """Synthetic build_plan benchmark that excludes media disk I/O."""
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter
 from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import renamer_core as core
 
