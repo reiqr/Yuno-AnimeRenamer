@@ -1,0 +1,80 @@
+--- a/AnimeRenamer.pyw
++++ b/AnimeRenamer.pyw
+@@ -667,35 +667,63 @@
+         main = ttk.Frame(shell, style='App.TFrame', padding=(13, 9, 13, 9))
+         main.pack(side='left', fill='both', expand=True)
+ 
+-        # Sidebar art is pre-scaled to the exact compact slot (236x328) to avoid blur or clipping.
++        # Give the artwork a little breathing room above it.  The image stays at its
++        # native 236x328 size; we move the whole visual block down instead of stretching it.
++        art_slot = tk.Frame(sidebar, bg='#110C14', width=236, height=340, bd=0, highlightthickness=0)
++        art_slot.pack(fill='x')
++        art_slot.pack_propagate(False)
+         self.sidebar_photo = self._load_photo('yuno_sidebar.png')
+         if self.sidebar_photo:
+-            tk.Label(sidebar, image=self.sidebar_photo, bg='#110C14', bd=0,
+-                     highlightthickness=0).pack(fill='x')
++            tk.Label(art_slot, image=self.sidebar_photo, bg='#110C14', bd=0,
++                     highlightthickness=0).pack(fill='x', pady=(12, 0))
+         else:
+-            fallback = tk.Canvas(sidebar, width=236, height=328, bg='#110C14', highlightthickness=0)
+-            fallback.pack(fill='x')
++            fallback = tk.Canvas(art_slot, width=236, height=328, bg='#110C14', highlightthickness=0)
++            fallback.pack(fill='x', pady=(12, 0))
+             fallback.create_oval(32, 34, 204, 206, fill='#321326', outline='#74244D', width=2)
+             fallback.create_text(118, 164, text='MIRAI NIKKI', fill='#FF6EA3',
+                                  font=(self.FONTS['display'], 16, 'bold'))
+             fallback.create_text(118, 194, text='theme asset missing', fill='#927B8A',
+                                  font=(self.FONTS['mono'], 8))
+ 
+-        side_text = ttk.Frame(sidebar, style='Sidebar.TFrame', padding=(17, 9, 16, 14))
++        # Split sidebar copy into three visual zones.  This avoids clustering every label
++        # directly below the artwork and leaving a large dead area near the bottom.
++        side_text = ttk.Frame(sidebar, style='Sidebar.TFrame', padding=(17, 10, 16, 14))
+         side_text.pack(fill='both', expand=True)
+-        ttk.Label(side_text, text='未来日记', style='Hero.TLabel').pack(anchor='w')
+-        ttk.Label(side_text, text='MIRAI NIKKI  /  RENAME TERMINAL', style='HeroSub.TLabel').pack(anchor='w', pady=(2, 9))
+-        ttk.Label(side_text, text='未来は、まだ書き換えられる。', style='Sidebar.TLabel',
++
++        side_intro = ttk.Frame(side_text, style='Sidebar.TFrame')
++        side_intro.pack(fill='x')
++        ttk.Label(side_intro, text='未来日记', style='Hero.TLabel').pack(anchor='w')
++        ttk.Label(side_intro, text='MIRAI NIKKI  /  RENAME TERMINAL', style='HeroSub.TLabel').pack(anchor='w', pady=(2, 8))
++        ttk.Label(side_intro, text='未来は、まだ書き換えられる。', style='Sidebar.TLabel',
+                   font=(self.FONTS['jp'], 10, 'bold')).pack(anchor='w')
+-        ttk.Label(side_text, text='确认预览，再改写文件名。', style='SidebarMuted.TLabel',
+-                  font=(self.FONTS['body'], 8), justify='left').pack(anchor='w', pady=(4, 10))
+-        ttk.Separator(side_text, orient='horizontal').pack(fill='x', pady=(1, 8))
+-        ttk.Label(side_text, text='01 SCAN  ·  02 CHECK  ·  03 REWRITE', style='HeroSub.TLabel',
++        ttk.Label(side_intro, text='确认预览，再改写文件名。', style='SidebarMuted.TLabel',
++                  font=(self.FONTS['body'], 8), justify='left').pack(anchor='w', pady=(4, 0))
++
++        ttk.Frame(side_text, style='Sidebar.TFrame').pack(fill='both', expand=True)
++
++        side_flow = ttk.Frame(side_text, style='Sidebar.TFrame')
++        side_flow.pack(fill='x', pady=(8, 0))
++        ttk.Separator(side_flow, orient='horizontal').pack(fill='x', pady=(0, 8))
++        ttk.Label(side_flow, text='DIARY FLOW', style='HeroSub.TLabel',
+                   font=(self.FONTS['mono'], 7, 'bold')).pack(anchor='w')
+-        ttk.Label(side_text, text='读取  →  校对  →  执行', style='SidebarMuted.TLabel',
+-                  font=(self.FONTS['body'], 8)).pack(anchor='w', pady=(4, 0))
+-        ttk.Label(side_text, text=f'AnimeRenamer {VERSION}', style='SidebarMuted.TLabel',
+-                  font=(self.FONTS['mono'], 8)).pack(side='bottom', anchor='w')
++        for step, action, note in [('01', 'SCAN', '读取文件'), ('02', 'CHECK', '校对未来'),
++                                   ('03', 'REWRITE', '执行改名')]:
++            row = ttk.Frame(side_flow, style='Sidebar.TFrame')
++            row.pack(fill='x', pady=(4 if step == '01' else 2, 0))
++            ttk.Label(row, text=step, style='SidebarMuted.TLabel',
++                      font=(self.FONTS['mono'], 7, 'bold'), width=3).pack(side='left')
++            ttk.Label(row, text=action, style='SidebarMuted.TLabel',
++                      font=(self.FONTS['mono'], 7, 'bold'), width=9).pack(side='left')
++            ttk.Label(row, text=note, style='SidebarMuted.TLabel',
++                      font=(self.FONTS['body'], 7)).pack(side='left')
++
++        side_bottom = ttk.Frame(side_text, style='Sidebar.TFrame')
++        side_bottom.pack(fill='x', pady=(16, 0))
++        ttk.Separator(side_bottom, orient='horizontal').pack(fill='x', pady=(0, 8))
++        tk.Label(side_bottom, text='LOCAL / OFFLINE  ·  SAFE PREVIEW', bg='#110C14', fg='#59CFC8',
++                 font=(self.FONTS['mono'], 7, 'bold'), bd=0).pack(anchor='w')
++        ttk.Label(side_bottom, text=f'AnimeRenamer {VERSION}', style='SidebarMuted.TLabel',
++                  font=(self.FONTS['mono'], 8)).pack(anchor='w', pady=(5, 0))
