@@ -12,7 +12,7 @@
 - 在不降低素材与界面渲染分辨率的前提下，缩小初始窗口的物理尺寸。
 - 侧边栏角色图以完整头部的安全留白重新裁切，并保留 3 倍分辨率派生版本。
 - 拉丁文、中文、日文与终端风格文字分别使用已安装的 Windows 字体族。
-- 构建前清空产物，输出内嵌多尺寸 ICO 的 `AnimeRenamer_FutureDiary.exe`。
+- 构建时只清理 `build/`、生成的 `.spec` 和同名目标 EXE，不清空 `dist/` 中的其他文件；输出内嵌多尺寸 ICO 的 `AnimeRenamer_FutureDiary.exe`。
 - 新增 `refresh_icon_cache.bat`，用于处理资源管理器图标缓存过期。
 
 ## 0.3.0
