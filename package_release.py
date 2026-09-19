@@ -48,10 +48,13 @@ def package():
             for p in sorted(tests.glob('test_*.py'))
         ]
 
-    for exe_name in ['AnimeRenamer_FutureDiary.exe', 'AnimeRenamer.exe']:
-        exe = output / exe_name
-        if exe.exists():
-            files.append((exe, exe_name))
+    # Ship only the current build target. A stale AnimeRenamer.exe must never ride along.
+    exe = output / 'AnimeRenamer_FutureDiary.exe'
+    if exe.exists():
+        files.append((exe, exe.name))
+    stale = output / 'AnimeRenamer.exe'
+    if stale.exists():
+        print(f'warning: {stale.name} is a stale build and was NOT packaged. Delete it to avoid confusion.')
 
     prefix = f'AnimeRenamer_v{VERSION}/'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
