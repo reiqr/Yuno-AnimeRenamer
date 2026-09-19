@@ -123,7 +123,10 @@ class ThemeMixin:
         if meipass:
             roots.append(Path(meipass))
         try:
-            roots.append(Path(__file__).resolve().parent)
+            module_dir = Path(__file__).resolve().parent
+            roots.append(module_dir)
+            # Source layout keeps UI modules in ./ui while assets stay at repository root.
+            roots.append(module_dir.parent)
         except NameError:
             pass
         if getattr(sys, 'frozen', False):
@@ -191,25 +194,40 @@ class ThemeMixin:
         self._theme_images.append(img)
         return img
 
+    def _set_banner_variant(self, variant='dark'):
+        variant = 'bright' if variant == 'bright' else 'dark'
+        if getattr(self, '_banner_variant', 'dark') != variant:
+            self._banner_variant = variant
+            self._draw_banner()
+
     def _draw_banner(self, _event=None):
         canvas = getattr(self, 'banner_canvas', None)
         if not canvas:
             return
         canvas.delete('overlay')
         width = max(canvas.winfo_width(), 720)
-        banner = getattr(self, 'banner_photo_wide', None) if width >= 840 else getattr(self, 'banner_photo', None)
+        variant = getattr(self, '_banner_variant', 'dark')
+        if variant == 'bright':
+            banner = getattr(self, 'banner_bright_photo_wide', None) if width >= 840 else getattr(self, 'banner_bright_photo', None)
+            veil_fill, veil_stipple = '#150B13', 'gray25'
+        else:
+            banner = getattr(self, 'banner_dark_photo_wide', None) if width >= 840 else getattr(self, 'banner_dark_photo', None)
+            veil_fill, veil_stipple = '#120A11', 'gray25'
         if banner:
             canvas.create_image(0, 0, image=banner, anchor='nw', tags='overlay')
-        # Dark veil on the right keeps text readable without altering the asset.
+        # Softer readable veil: keep the art visible instead of turning the whole strip nearly black.
         height = max(82, canvas.winfo_height())
-        canvas.create_rectangle(max(360, int(width * 0.44)), 0, width, height,
-                                fill='#0D0910', stipple='gray50', outline='', tags='overlay')
+        canvas.create_rectangle(max(420, int(width * 0.52)), 0, width, height,
+                                fill=veil_fill, stipple=veil_stipple, outline='', tags='overlay')
         tx = max(470, int(width * 0.58))
-        canvas.create_text(tx, 17, text='ANIME RENAMER', anchor='w', fill='#FFF2F7',
+        title_fill = '#FFF5F9' if variant == 'bright' else '#FFF2F7'
+        subtitle_fill = '#FF79AE' if variant == 'bright' else '#FF6EA3'
+        step_fill = '#D8CFD4' if variant == 'bright' else '#C9BCC5'
+        canvas.create_text(tx, 17, text='ANIME RENAMER', anchor='w', fill=title_fill,
                            font=(self.FONTS['latin'], 17, 'bold'), tags='overlay')
-        canvas.create_text(tx, 37, text='未来日记 · RENAME TERMINAL', anchor='w', fill='#FF6EA3',
+        canvas.create_text(tx, 37, text='未来日记 · RENAME TERMINAL', anchor='w', fill=subtitle_fill,
                            font=(self.FONTS['body'], 9, 'bold'), tags='overlay')
-        canvas.create_text(tx, 56, text='01 SCAN   →   02 CHECK   →   03 REWRITE', anchor='w', fill='#C9BCC5',
+        canvas.create_text(tx, 56, text='01 SCAN   →   02 CHECK   →   03 REWRITE', anchor='w', fill=step_fill,
                            font=(self.FONTS['mono'], 7, 'bold'), tags='overlay')
         line_y = min(height - 8, 70)
         canvas.create_line(tx, line_y, min(width - 24, tx + 170), line_y,

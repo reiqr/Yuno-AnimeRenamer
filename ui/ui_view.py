@@ -135,6 +135,13 @@ class ViewMixin:
             self.preview_status_left.configure(bg=border)
         if hasattr(self, 'preview_status_right'):
             self.preview_status_right.configure(bg=fg if mode in ('success', 'busy') else '#285F62')
+        if hasattr(self, '_set_banner_variant'):
+            # Safe preview / successful completion use the bright material.
+            # Waiting, dirty, review and error states stay on the darker material.
+            if mode == 'success':
+                self._set_banner_variant('bright')
+            elif mode != 'busy':
+                self._set_banner_variant('dark')
 
     def _update_conditional_rows(self):
         """Keep the default window compact; reveal advanced rows only when needed."""
@@ -170,6 +177,7 @@ class ViewMixin:
             self._busy_anim_id = None
             return
         frames = ('PROCESSING ·', 'PROCESSING ··', 'PROCESSING ···')
+        self._set_banner_variant('bright' if (self._busy_anim_step % 2) else 'dark')
         self._set_chrome_state(frames[self._busy_anim_step % len(frames)], 'busy')
         self._busy_anim_step += 1
         self._busy_anim_id = self.after(320, self._busy_anim_tick)

@@ -97,9 +97,12 @@ class LayoutMixin:
         self.chrome_status_line = tk.Frame(chrome, bg='#3A3239', height=2, bd=0)
         self.chrome_status_line.grid(row=1, column=0, columnspan=3, sticky='ew', pady=(5, 0))
 
-        # Banner art is pre-scaled to 760x82 for the compact window; text stays native Tk for crispness.
-        self.banner_photo = self._load_photo('yuno_banner.png')
-        self.banner_photo_wide = self._load_photo('yuno_banner_wide.png')
+        # Banner art has dark/bright variants: idle states stay moody, ready states brighten.
+        self.banner_dark_photo = self._load_photo('yuno_banner_dark.png') or self._load_photo('yuno_banner.png')
+        self.banner_dark_photo_wide = self._load_photo('yuno_banner_dark_wide.png') or self._load_photo('yuno_banner_wide.png')
+        self.banner_bright_photo = self._load_photo('yuno_banner_bright.png') or self.banner_dark_photo
+        self.banner_bright_photo_wide = self._load_photo('yuno_banner_bright_wide.png') or self.banner_dark_photo_wide
+        self._banner_variant = 'dark'
         self.banner_canvas = tk.Canvas(main, height=82, bg='#140C13', bd=0,
                                        highlightthickness=1, highlightbackground='#3A2835', relief='flat')
         self.banner_canvas.pack(fill='x', pady=(0, 8))
