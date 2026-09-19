@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 from renamer_core import VERSION
 
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+EXE_PREFIX = "AnimeRenamer_FutureDiary"
 
 
 def parse_product_version(version: str = VERSION) -> tuple[int, int, int]:
@@ -69,17 +70,33 @@ def resolve_build_number(explicit: int | None = None) -> int:
     return build
 
 
+def full_version(build: int, version: str = VERSION) -> str:
+    parse_product_version(version)
+    build_number = resolve_build_number(build)
+    return f"{version}.{build_number}"
+
+
+def exe_basename(build: int, version: str = VERSION) -> str:
+    return f"{EXE_PREFIX}_v{full_version(build, version)}"
+
+
+def exe_filename(build: int, version: str = VERSION) -> str:
+    return exe_basename(build, version) + ".exe"
+
+
 def render_version_info(build: int, version: str = VERSION) -> str:
     major, minor, patch = parse_product_version(version)
-    file_version = f"{major}.{minor}.{patch}.{build}"
+    build_number = resolve_build_number(build)
+    file_version = full_version(build_number, version)
+    original_filename = exe_filename(build_number, version)
     return f"""VSVersionInfo(
-  ffi=FixedFileInfo(filevers=({major}, {minor}, {patch}, {build}), prodvers=({major}, {minor}, {patch}, 0),
+  ffi=FixedFileInfo(filevers=({major}, {minor}, {patch}, {build_number}), prodvers=({major}, {minor}, {patch}, 0),
     mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
   kids=[StringFileInfo([StringTable('080404b0', [
     StringStruct('FileDescription', 'AnimeRenamer - Future Diary Edition'),
     StringStruct('FileVersion', '{file_version}'),
-    StringStruct('InternalName', 'AnimeRenamer_FutureDiary'),
-    StringStruct('OriginalFilename', 'AnimeRenamer_FutureDiary.exe'),
+    StringStruct('InternalName', '{EXE_PREFIX}'),
+    StringStruct('OriginalFilename', '{original_filename}'),
     StringStruct('ProductName', 'AnimeRenamer'),
     StringStruct('ProductVersion', '{version}')
   ])]), VarFileInfo([VarStruct('Translation', [2052, 1200])])]
@@ -95,7 +112,8 @@ def generate(output: str | Path, build: int | None = None) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(render_version_info(build_number), encoding="utf-8")
     print(f"ProductVersion: {VERSION}")
-    print(f"FileVersion: {VERSION}.{build_number}")
+    print(f"FileVersion: {full_version(build_number)}")
+    print(f"Executable: {exe_filename(build_number)}")
     print(target)
     return target
 

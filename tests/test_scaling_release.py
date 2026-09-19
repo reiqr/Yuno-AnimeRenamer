@@ -56,6 +56,16 @@ class VersionInfoTests(unittest.TestCase):
         self.assertIn("prodvers=(1, 2, 3, 0)", text)
         self.assertIn("StringStruct('FileVersion', '1.2.3.42')", text)
         self.assertIn("StringStruct('ProductVersion', '1.2.3')", text)
+        self.assertIn(
+            "StringStruct('OriginalFilename', 'AnimeRenamer_FutureDiary_v1.2.3.42.exe')",
+            text,
+        )
+
+    def test_versioned_exe_name_uses_full_build_version(self):
+        self.assertEqual(
+            version_info.exe_filename(42, '1.2.3'),
+            'AnimeRenamer_FutureDiary_v1.2.3.42.exe',
+        )
 
     def test_explicit_build_number_has_priority(self):
         with patch.dict(os.environ, {'GITHUB_RUN_NUMBER': '99'}, clear=False):
@@ -87,6 +97,8 @@ class UiDisplayGuardTests(unittest.TestCase):
 
 
 class ReleasePackagingTests(unittest.TestCase):
+    BUILD_NO = 42
+
     def _make_fixture(self, root):
         for name in [
             'AnimeRenamer.pyw', 'renamer_core.py', 'file_operations.py', *UI_MODULES,
@@ -102,34 +114,60 @@ class ReleasePackagingTests(unittest.TestCase):
             (assets / name).write_bytes(b'asset')
         dist = root / 'dist'
         dist.mkdir()
-        (dist / 'AnimeRenamer_FutureDiary.exe').write_bytes(b'current')
+        current_exe = version_info.exe_filename(self.BUILD_NO, core.VERSION)
+        (dist / current_exe).write_bytes(b'current')
+        (dist / 'AnimeRenamer_FutureDiary.exe').write_bytes(b'old-unversioned')
         (dist / 'AnimeRenamer.exe').write_bytes(b'legacy')
-        return assets
+        return assets, current_exe
 
-    def test_license_is_included_and_legacy_exe_is_excluded(self):
+    def test_license_is_included_and_legacy_exes_are_excluded(self):
         with tempfile.TemporaryDirectory(prefix='anime_release_') as td:
             root = Path(td)
-            self._make_fixture(root)
+            _, current_exe = self._make_fixture(root)
+            env = {
+                'ANIMERENAMER_BUILD_NUMBER': str(self.BUILD_NO),
+                'ANIMERENAMER_EXE_NAME': current_exe,
+            }
             with patch.object(release, '__file__', str(root / 'package_release.py')):
-                archive = release.package()
+                with patch.dict(os.environ, env, clear=False):
+                    archive = release.package()
             with zipfile.ZipFile(archive) as z:
                 names = set(z.namelist())
             prefix = f'AnimeRenamer_v{core.VERSION}/'
             self.assertIn(prefix + 'LICENSE', names)
             for module in UI_MODULES:
                 self.assertIn(prefix + module, names)
-            self.assertIn(prefix + 'AnimeRenamer_FutureDiary.exe', names)
+            self.assertIn(prefix + current_exe, names)
+            self.assertNotIn(prefix + 'AnimeRenamer_FutureDiary.exe', names)
             self.assertNotIn(prefix + 'AnimeRenamer.exe', names)
             self.assertFalse(any(Path(name).suffix.lower() in release.FONT_SUFFIXES for name in names))
+
+    def test_mismatched_configured_exe_name_is_rejected(self):
+        with tempfile.TemporaryDirectory(prefix='anime_release_name_') as td:
+            root = Path(td)
+            self._make_fixture(root)
+            env = {
+                'ANIMERENAMER_BUILD_NUMBER': str(self.BUILD_NO),
+                'ANIMERENAMER_EXE_NAME': 'AnimeRenamer_FutureDiary_v0.0.0.1.exe',
+            }
+            with patch.object(release, '__file__', str(root / 'package_release.py')):
+                with patch.dict(os.environ, env, clear=False):
+                    with self.assertRaisesRegex(RuntimeError, '当前版本不一致'):
+                        release.package()
 
     def test_font_asset_is_rejected_from_release(self):
         with tempfile.TemporaryDirectory(prefix='anime_release_font_') as td:
             root = Path(td)
-            assets = self._make_fixture(root)
+            assets, current_exe = self._make_fixture(root)
             (assets / 'should_not_ship.ttf').write_bytes(b'font')
+            env = {
+                'ANIMERENAMER_BUILD_NUMBER': str(self.BUILD_NO),
+                'ANIMERENAMER_EXE_NAME': current_exe,
+            }
             with patch.object(release, '__file__', str(root / 'package_release.py')):
-                with self.assertRaisesRegex(RuntimeError, '字体文件'):
-                    release.package()
+                with patch.dict(os.environ, env, clear=False):
+                    with self.assertRaisesRegex(RuntimeError, '字体文件'):
+                        release.package()
 
 
 if __name__ == '__main__':

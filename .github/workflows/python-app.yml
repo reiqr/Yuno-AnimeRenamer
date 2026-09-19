@@ -72,15 +72,26 @@ jobs:
             python -m pip install -r requirements.txt
           }
 
-      - name: Build AnimeRenamer_FutureDiary.exe
+      - name: Build versioned Windows EXE
         shell: pwsh
         run: |
+          $buildNo = [int]"${{ github.run_number }}"
+
           python tools/generate_version_info.py `
             --output build/windows_version_info.txt `
-            --build "${{ github.run_number }}"
+            --build $buildNo
+
+          $exeBase = (python -c "from tools.generate_version_info import exe_basename; print(exe_basename($buildNo))").Trim()
+          if (-not $exeBase) {
+            throw "Failed to resolve versioned EXE name"
+          }
+          $exeName = "$exeBase.exe"
+
+          "ANIMERENAMER_BUILD_NUMBER=$buildNo" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ANIMERENAMER_EXE_NAME=$exeName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
           python -m PyInstaller --noconfirm --clean --onefile --windowed --noupx `
-            --name AnimeRenamer_FutureDiary `
+            --name "$exeBase" `
             --paths "$PWD\ui" `
             --version-file "$PWD\build\windows_version_info.txt" `
             --icon "$PWD\assets\app_icon.ico" `
@@ -88,8 +99,8 @@ jobs:
             --distpath "$PWD\dist" `
             AnimeRenamer.pyw
 
-          if (-not (Test-Path "dist\AnimeRenamer_FutureDiary.exe")) {
-            throw "PyInstaller completed without producing dist\AnimeRenamer_FutureDiary.exe"
+          if (-not (Test-Path "dist\$exeName")) {
+            throw "PyInstaller completed without producing dist\$exeName"
           }
 
       - name: Create release ZIP
@@ -99,7 +110,7 @@ jobs:
         shell: pwsh
         run: |
           $files = @(
-            Get-Item "dist\AnimeRenamer_FutureDiary.exe"
+            Get-Item "dist\$env:ANIMERENAMER_EXE_NAME"
             Get-ChildItem "dist\AnimeRenamer_v*.zip" -File
           )
           $lines = $files | ForEach-Object {
@@ -114,7 +125,7 @@ jobs:
         with:
           name: AnimeRenamer-Windows-${{ github.run_number }}
           path: |
-            dist/AnimeRenamer_FutureDiary.exe
+            dist/AnimeRenamer_FutureDiary_v*.exe
             dist/AnimeRenamer_v*.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error

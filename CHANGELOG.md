@@ -2,10 +2,10 @@
 
 ## 2026-09-19：Preview 19 系列与功能收尾
 
-- 增加自动 Windows 构建版本号：产品版本继续读取 `renamer_core.VERSION`，EXE `FileVersion` 自动追加 CI 运行号或本地 Git 提交计数。
+- 增加自动 Windows 构建版本号：产品版本继续读取 `renamer_core.VERSION`，EXE `FileVersion` 自动追加 CI 运行号或本地 Git 提交计数；编译产物文件名同步使用完整版本，例如 `AnimeRenamer_FutureDiary_v0.3.0.57.exe`。
 - 增加发布字体保护：发布包拒绝捆绑字体文件，并新增 DPI 初始化顺序与 UI 字号范围回归检查。
 - 项目目录重新整理：核心模块继续保留在仓库根目录，界面代码集中到 `ui/`，资源集中到 `assets/`，工具脚本集中到 `tools/`，历史 Preview 资料移入 `history/`。
-- CI 已适配新的目录结构，Windows 构建继续输出 `dist/AnimeRenamer_FutureDiary.exe`。
+- CI 已适配新的目录结构，Windows 构建输出改为带完整构建版本号的 `dist/AnimeRenamer_FutureDiary_v*.exe`。
 - 增加轻小说模式，与番剧集数解析分离；支持 EPUB、MOBI、AZW3、PDF、TXT、CBZ 文件名中的卷号、卷标题和上下册识别。
 - 增加内容类型选择器，可在番剧与轻小说模式之间切换。
 - 增加 Future Diary 状态联动 Banner：等待、待刷新、检查与冲突状态使用暗态素材，安全预览和完成状态使用亮态素材，处理中保留动态状态提示。
@@ -13,7 +13,7 @@
 - 增加安全取消复制：取消后清理本次临时文件与副本，原文件保持不变；若清理未完成则保留恢复记录。
 - 修正右侧工作区顶部对齐、内容选择器尺寸和空预览说明文字被裁切的问题。
 - `build_exe.bat` 不自动安装或升级 PyInstaller，不清空整个 `dist/`，并继续使用 `assets/app_icon.ico` 作为 EXE 图标。
-- README 已同步当前目录、按钮名称、轻小说模式、复制进度 / 安全取消和 Preview 19 UI 状态。
+- README 已同步当前目录、按钮名称、轻小说模式、复制进度 / 安全取消、Preview 19 UI 状态和版本化 EXE 命名规则。
 
 ## Future Diary UI 打包合集（2026-09-19）
 
@@ -27,7 +27,7 @@
 - 在不降低素材与界面渲染分辨率的前提下，缩小初始窗口的物理尺寸。
 - 侧边栏角色图以完整头部的安全留白重新裁切，并保留高分辨率派生版本。
 - 拉丁文、中文、日文与终端风格文字分别使用已安装的 Windows 字体族。
-- 构建时只清理 `build/`、生成的 `.spec` 和同名目标 EXE，不清空 `dist/` 中的其他文件；输出内嵌多尺寸 ICO 的 `AnimeRenamer_FutureDiary.exe`。
+- 构建时只清理 `build/`、生成的 `.spec` 和同名目标 EXE，不清空 `dist/` 中的其他文件；当时输出内嵌多尺寸 ICO 的 `AnimeRenamer_FutureDiary.exe`。
 - 新增 `refresh_icon_cache.bat`，用于处理资源管理器图标缓存过期。
 
 ## 0.3.0

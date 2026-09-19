@@ -4,7 +4,7 @@ Windows 离线番剧、字幕与轻小说文件整理工具。先扫描并检查
 
 ## 启动
 
-- 已打包版本：双击 `AnimeRenamer_FutureDiary.exe`，无需安装 Python。
+- 已打包版本：双击 `AnimeRenamer_FutureDiary_v<产品版本>.<构建号>.exe`，例如 `AnimeRenamer_FutureDiary_v0.3.0.57.exe`，无需安装 Python。
 - 源码版本：安装 Python 3.10+，双击 `run_app.bat`，或运行 `python AnimeRenamer.pyw`。程序运行只使用 Python 标准库。
 - 兼容入口：旧中文名脚本 `运行 AnimeRenamer.bat` 与 `生成EXE.bat` 仍然保留可用；新用户建议使用英文名脚本。若旧构建脚本与当前说明不一致，以 `build_exe.bat` 为准。
 - 源码与后续 Git 历史固定保存在 `AnimeRenamer` 目录；旁边的旧版本目录和 ZIP 可作为原始交付备份保留。
@@ -143,22 +143,23 @@ Windows 离线番剧、字幕与轻小说文件整理工具。先扫描并检查
 python -m pip install pyinstaller
 ```
 
-随后双击 `build_exe.bat`，输出：
+随后双击 `build_exe.bat`。EXE 文件名会直接包含完整构建版本，例如：
 
 ```text
-dist\AnimeRenamer_FutureDiary.exe
+dist\AnimeRenamer_FutureDiary_v0.3.0.57.exe
 ```
 
 构建前会由 `tools/generate_version_info.py` 自动生成 Windows 版本信息：
 
 - `ProductVersion` 直接读取 `renamer_core.VERSION`，仍是项目发布版本，例如 `0.3.0`；
 - `FileVersion` 追加自动构建号，例如 `0.3.0.57`；
+- EXE 文件名使用与 `FileVersion` 相同的完整版本号；
 - GitHub Actions 使用 `github.run_number` 作为构建号；
 - 本地 `build_exe.bat` 使用当前 Git 提交数量作为构建号；若源码不在 Git 仓库中则使用 `0`。
 
-因此每次 CI 新构建都可从 EXE 属性中区分，同时产品版本仍只维护一个来源。仓库中的旧 `tools/windows_version_info.txt` 仅保留为历史兼容参考，正式构建和发布包不再依赖它。
+因此每次 CI 新构建都能直接从文件名和 EXE 属性中区分，同时产品版本仍只维护一个来源。仓库中的旧 `tools/windows_version_info.txt` 仅保留为历史兼容参考，正式构建和发布包不再依赖它。
 
-构建脚本会使用 `assets\app_icon.ico` 作为 Windows EXE 图标，并把 `assets/` 一并打包。脚本只清理 `build/`、生成的 `.spec` 和同名目标 EXE，**不会清空整个 `dist/` 目录**，因此不会删除其中其他发布 ZIP 或文件。
+构建脚本会使用 `assets\app_icon.ico` 作为 Windows EXE 图标，并把 `assets/` 一并打包。脚本只清理 `build/`、生成的 `.spec` 和**当前同版本目标 EXE**，不会清空整个 `dist/` 目录，也不会删除其他旧版本 EXE 或发布 ZIP。
 
 运行测试：
 
@@ -172,7 +173,7 @@ python -m unittest discover -s tests -v
 python tools/package_release.py
 ```
 
-发布包输出到 `dist`，ZIP 仅包含源码、测试、文档、启动 / 构建脚本和 EXE（已构建时），不包含 Git、缓存或真实媒体文件。
+发布包输出到 `dist`。如果当前版本对应的 EXE 已构建，发布 ZIP 只收录这一份版本匹配的 EXE；旧的无版本号 EXE 和其他历史 EXE 不会混入。ZIP 不包含 Git、缓存、真实媒体文件或字体文件。
 
 ## Future Diary UI
 
@@ -201,6 +202,6 @@ python tools/package_release.py
 - UI 字体只从系统已安装字体中选择；中文优先 `Microsoft YaHei UI`，拉丁标题优先 `Bahnschrift / Segoe UI`，日文优先 `Yu Gothic UI`，等宽标签优先 `Cascadia Mono / Consolas`。显式字号保持在紧凑可读区间，不捆绑字体文件。
 - 发布脚本会拒绝将 `.ttf/.otf/.ttc/.woff/.woff2` 等字体文件打入发布包，避免字体授权与体积问题。
 - 侧边栏角色图以安全的头部与发丝留白显示，高分辨率派生源保留在 `assets/yuno_sidebar_hd.png`；运行时使用原生 Tk 图像资源，不对整个窗口做低分辨率截图式缩放。
-- 打包 EXE 输出为 `dist/AnimeRenamer_FutureDiary.exe`，避免资源管理器继续复用旧 `AnimeRenamer.exe` 的图标缓存。
-- `build_exe.bat` 每次构建前只清理 `build/`、生成的 `.spec` 和同名目标 EXE，不删除 `dist/` 中其他文件，也不会自动安装或升级依赖。
-- 若资源管理器仍显示旧图标，可运行一次 `tools/refresh_icon_cache.bat` 后重新打开文件夹。
+- 打包 EXE 使用 `AnimeRenamer_FutureDiary_v<产品版本>.<构建号>.exe`，文件名、Windows `FileVersion` 和发布包选取保持一致。
+- `build_exe.bat` 每次构建前只清理 `build/`、生成的 `.spec` 和当前同版本目标 EXE，不删除 `dist/` 中其他文件，也不会自动安装或升级依赖。
+- 若资源管理器仍显示旧图标或旧版本信息，可运行一次 `tools/refresh_icon_cache.bat` 后重新打开文件夹。

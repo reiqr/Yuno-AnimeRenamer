@@ -1,7 +1,9 @@
 """Create a clean release ZIP from the organized repository layout."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import subprocess
 import sys
 import zipfile
 
@@ -16,8 +18,49 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from renamer_core import VERSION
+from tools.generate_version_info import exe_filename, resolve_build_number
 
 FONT_SUFFIXES = {'.ttf', '.otf', '.ttc', '.woff', '.woff2'}
+
+
+def _git_commit_count(root):
+    try:
+        result = subprocess.run(
+            ['git', 'rev-list', '--count', 'HEAD'],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return int(result.stdout.strip())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def _release_build_number(root):
+    value = os.environ.get('ANIMERENAMER_BUILD_NUMBER', '').strip()
+    if value:
+        try:
+            return resolve_build_number(int(value))
+        except ValueError as exc:
+            raise RuntimeError('ANIMERENAMER_BUILD_NUMBER 必须是 0–65535 的整数') from exc
+    git_count = _git_commit_count(root)
+    return resolve_build_number(git_count if git_count is not None else 0)
+
+
+def _release_exe_name(root):
+    build_number = _release_build_number(root)
+    expected = exe_filename(build_number, VERSION)
+    configured = os.environ.get('ANIMERENAMER_EXE_NAME', '').strip()
+    if not configured:
+        return expected
+    if Path(configured).name != configured:
+        raise RuntimeError('ANIMERENAMER_EXE_NAME 只能是文件名，不能包含路径')
+    if configured != expected:
+        raise RuntimeError(
+            f'ANIMERENAMER_EXE_NAME 与当前版本不一致：期望 {expected}，实际 {configured}')
+    return configured
 
 
 def package():
@@ -70,12 +113,14 @@ def package():
         files += [(p, p.relative_to(root).as_posix())
                   for p in sorted(benchmarks.glob('*.py'))]
 
-    exe = output / 'AnimeRenamer_FutureDiary.exe'
+    expected_exe_name = _release_exe_name(root)
+    exe = output / expected_exe_name
     if exe.exists():
         files.append((exe, exe.name))
-    stale = output / 'AnimeRenamer.exe'
-    if stale.exists():
-        print(f'warning: {stale.name} is stale and was NOT packaged.')
+
+    for stale in sorted(output.glob('AnimeRenamer*.exe')):
+        if stale.name != expected_exe_name:
+            print(f'warning: {stale.name} is stale and was NOT packaged.')
 
     prefix = f'AnimeRenamer_v{VERSION}/'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
@@ -94,7 +139,10 @@ def package():
         if ui_dir.is_dir():
             for module in ui_dir.glob('*.py'):
                 assert prefix + module.relative_to(root).as_posix() in names
+        if exe.exists():
+            assert prefix + exe.name in names
         assert prefix + 'AnimeRenamer.exe' not in names
+        assert prefix + 'AnimeRenamer_FutureDiary.exe' not in names
         assert not any(Path(name).suffix.lower() in FONT_SUFFIXES for name in names)
 
     print(archive)

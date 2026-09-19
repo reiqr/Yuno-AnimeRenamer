@@ -11,6 +11,7 @@ rem Only clear generated build cache/spec files. Never delete the whole dist dir
 if exist build rmdir /s /q build
 if exist AnimeRenamer.spec del /q AnimeRenamer.spec
 if exist AnimeRenamer_FutureDiary.spec del /q AnimeRenamer_FutureDiary.spec
+if exist "AnimeRenamer_FutureDiary_v*.spec" del /q "AnimeRenamer_FutureDiary_v*.spec"
 
 %PY% -m PyInstaller --version >nul 2>nul
 if errorlevel 1 (
@@ -37,19 +38,19 @@ if not defined BUILD_NO set "BUILD_NO=0"
 %PY% tools\generate_version_info.py --output build\windows_version_info.txt --build %BUILD_NO%
 if errorlevel 1 goto :fail
 
-if not exist dist mkdir dist
-rem Remove only this build target so unrelated release ZIPs/files in dist are preserved.
-rem Retry a few times for short-lived Explorer/antivirus locks, but never kill processes automatically.
-for /l %%R in (1,1,3) do (
-  if exist "dist\AnimeRenamer_FutureDiary.exe" (
-    del /f /q "dist\AnimeRenamer_FutureDiary.exe" >nul 2>nul
-    if exist "dist\AnimeRenamer_FutureDiary.exe" timeout /t 1 /nobreak >nul
-  )
+set "EXE_BASE="
+for /f "delims=" %%I in ('%PY% -c "from tools.generate_version_info import exe_basename; print(exe_basename(%BUILD_NO%))"') do set "EXE_BASE=%%I"
+if not defined EXE_BASE (
+  echo Failed to resolve versioned EXE name.
+  goto :fail
 )
-if exist "dist\AnimeRenamer_FutureDiary.exe" goto :locked_exe
+
+if not exist dist mkdir dist
+rem Remove only the exact current build target. Preserve older builds and unrelated dist files.
+if exist "dist\%EXE_BASE%.exe" del /q "dist\%EXE_BASE%.exe"
 
 %PY% -m PyInstaller --noconfirm --clean --onefile --windowed --noupx ^
-  --name AnimeRenamer_FutureDiary ^
+  --name "%EXE_BASE%" ^
   --paths "%CD%\ui" ^
   --version-file "%CD%\build\windows_version_info.txt" ^
   --icon "%CD%\assets\app_icon.ico" ^
@@ -61,27 +62,14 @@ if errorlevel 1 goto :fail
 
 echo.
 echo Build complete:
-echo   dist\AnimeRenamer_FutureDiary.exe
-echo   FileVersion uses the current Git commit count as its build number.
+echo   dist\%EXE_BASE%.exe
+echo   FileVersion and EXE filename use the current Git commit count as the build number.
 echo.
-echo Existing unrelated files in dist were preserved.
+echo Existing unrelated files and older versioned builds in dist were preserved.
 echo If Explorer still shows an old icon or version, run tools\refresh_icon_cache.bat once.
 echo.
 pause
 exit /b 0
-
-:locked_exe
-echo.
-echo Cannot replace dist\AnimeRenamer_FutureDiary.exe because Windows is still using it.
-echo Close AnimeRenamer_FutureDiary.exe first. If it is already closed, also close
-echo Explorer Preview/Details panes for this EXE and wait for antivirus scanning to finish.
-echo.
-echo Running process check:
-tasklist /fi "IMAGENAME eq AnimeRenamer_FutureDiary.exe" 2^>nul | findstr /i "AnimeRenamer_FutureDiary.exe"
-echo.
-echo No process listed above usually means Explorer or antivirus still holds the file briefly.
-echo Run build_exe.bat again after the lock is released.
-goto :fail
 
 :fail
 echo.
