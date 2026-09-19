@@ -1,0 +1,139 @@
+         ttk.Label(preview_head, text='CYAN 可执行   ·   AMBER 待确认   ·   RED 冲突   ·   GRAY 跳过', style='MutedPanel.TLabel').pack(side='right')
+ 
+-        preview = ttk.Frame(preview_card, style='Panel.TFrame')
+-        preview.pack(fill='both', expand=True)
++        preview_shell = tk.Frame(preview_card, bg='#2C222C', bd=0, highlightthickness=1,
++                                 highlightbackground='#2C222C')
++        preview_shell.pack(fill='both', expand=True)
++        preview = ttk.Frame(preview_shell, style='Panel.TFrame')
++        preview.pack(fill='both', expand=True, padx=1, pady=1)
+         cols = ('kind', 'old', 'detected', 'new', 'status')
+         self.tree = ttk.Treeview(preview, columns=cols, show='tree headings', selectmode='extended')
+         self.tree.heading('#0', text='GROUP  /  分组')
+@@ -826,37 +849,41 @@
+         self.tree.bind('<ButtonRelease-1>', lambda _e: self.after_idle(self._sync_group_markers), add='+')
+         self._hover_iid = None
+ 
+-        # Empty-state illustration is drawn locally, so the patch stays single-file.
+-        self.empty_state = tk.Frame(preview, bg='#121017', bd=0)
+-        self.empty_state.place(relx=0.5, rely=0.5, anchor='center', width=390, height=170)
+-        empty_canvas = tk.Canvas(self.empty_state, width=92, height=128, bg='#121017',
++        # Empty state is a compact in-canvas diary card rather than a large opaque cover.
++        self.empty_state = tk.Frame(preview, bg='#17131B', bd=0, highlightthickness=1,
++                                    highlightbackground='#493340', highlightcolor='#493340')
++        self.empty_state.place(relx=0.5, rely=0.52, anchor='center', width=344, height=132)
++        tk.Frame(self.empty_state, bg='#8E2C59', height=2, bd=0).pack(fill='x')
++        empty_canvas = tk.Canvas(self.empty_state, width=72, height=100, bg='#17131B',
+                                  highlightthickness=0, bd=0)
+-        empty_canvas.pack(side='left', padx=(12, 18), pady=18)
+-        empty_canvas.create_rectangle(18, 7, 75, 116, outline='#5A3146', width=2)
+-        empty_canvas.create_rectangle(25, 19, 68, 83, outline='#2D6B6B', fill='#15141A', width=1)
+-        empty_canvas.create_text(46, 49, text='♥', fill=c['pink'], font=(self.FONTS['body'], 22, 'bold'))
+-        empty_canvas.create_line(31, 94, 61, 94, fill='#38D6D0', width=2)
+-        empty_canvas.create_oval(42, 103, 50, 111, outline='#8F7183', width=1)
+-        empty_text = tk.Frame(self.empty_state, bg='#121017')
+-        empty_text.pack(side='left', fill='both', expand=True, pady=30)
++        empty_canvas.pack(side='left', padx=(14, 14), pady=(14, 10))
++        empty_canvas.create_rectangle(13, 5, 59, 91, outline='#644052', width=2)
++        empty_canvas.create_rectangle(18, 14, 54, 64, outline='#2D6B6B', fill='#121017', width=1)
++        empty_canvas.create_text(36, 38, text='♥', fill=c['pink'], font=(self.FONTS['body'], 17, 'bold'))
++        empty_canvas.create_line(23, 73, 49, 73, fill='#38D6D0', width=2)
++        empty_canvas.create_oval(33, 80, 39, 86, outline='#8F7183', width=1)
++        empty_text = tk.Frame(self.empty_state, bg='#17131B')
++        empty_text.pack(side='left', fill='both', expand=True, pady=(20, 12), padx=(0, 12))
+         self.empty_title_var = tk.StringVar(value='尚未读取未来')
+         self.empty_sub_var = tk.StringVar(value='选择文件夹并扫描后，重命名预览会显示在这里。')
+-        tk.Label(empty_text, textvariable=self.empty_title_var, bg='#121017', fg='#F7EAF3',
+-                 font=(self.FONTS['display'], 13, 'bold'), anchor='w').pack(fill='x')
+-        tk.Label(empty_text, text='WAITING FOR DIARY DATA', bg='#121017', fg=c['cyan'],
+-                 font=(self.FONTS['mono'], 8, 'bold'), anchor='w').pack(fill='x', pady=(3, 8))
+-        tk.Label(empty_text, textvariable=self.empty_sub_var, bg='#121017', fg='#9F929B',
+-                 wraplength=245, justify='left', anchor='w', font=(self.FONTS['body'], 9)).pack(fill='x')
+-
+-        # Detail/status bar
+-        detail_card = ttk.Frame(main, style='Card.TFrame', padding=(11, 8))
+-        detail_card.pack(fill='x', pady=(8, 0))
++        tk.Label(empty_text, textvariable=self.empty_title_var, bg='#17131B', fg='#F7EAF3',
++                 font=(self.FONTS['display'], 12, 'bold'), anchor='w').pack(fill='x')
++        tk.Label(empty_text, text='WAITING FOR DIARY DATA', bg='#17131B', fg=c['cyan'],
++                 font=(self.FONTS['mono'], 7, 'bold'), anchor='w').pack(fill='x', pady=(2, 6))
++        tk.Label(empty_text, textvariable=self.empty_sub_var, bg='#17131B', fg='#9F929B',
++                 wraplength=220, justify='left', anchor='w', font=(self.FONTS['body'], 8)).pack(fill='x')
++
++        # Compact log rail: keep detail available without stealing preview height.
++        detail_outer = tk.Frame(main, bg='#2F3539', bd=0, highlightthickness=0)
++        detail_outer.pack(fill='x', pady=(6, 0))
++        detail_card = ttk.Frame(detail_outer, style='Card.TFrame', padding=(10, 6))
++        detail_card.pack(fill='x', padx=1, pady=1)
+         self.detail_var = tk.StringVar(value='待确认的文件不会执行。悬停查看识别依据；双击文件可以纠正集数或特别篇。')
+-        ttk.Label(detail_card, text='DIARY LOG', style='Cyan.TLabel').pack(anchor='w')
+-        ttk.Label(detail_card, textvariable=self.detail_var, style='Card.TLabel', wraplength=780).pack(fill='x', pady=(2, 0))
++        ttk.Label(detail_card, text='DIARY LOG', style='Cyan.TLabel').pack(side='left', padx=(0, 10))
++        ttk.Label(detail_card, textvariable=self.detail_var, style='Card.TLabel', wraplength=780).pack(side='left', fill='x', expand=True)
+ 
+         footer = ttk.Frame(main, style='App.TFrame')
+-        footer.pack(fill='x', pady=(9, 0))
++        footer.pack(fill='x', pady=(7, 0))
+         left_footer = ttk.Frame(footer, style='App.TFrame')
+         left_footer.pack(side='left', fill='x', expand=True)
+         self.status_var = tk.StringVar(value='选择文件夹，填写作品名，然后扫描未来记录。')
+@@ -869,7 +896,7 @@
+                   font=(self.FONTS['mono'], 8, 'bold'), bd=0)
+         self.footer_state_label.pack(side='right', padx=(0, 10))
+ 
+-        for variable in [self.folder_var, self.title_var, self.season_var, self.template_var,
++        for variable in [self.folder_var, self.title_var, self.season_var, self.template_name_var, self.template_var,
+                          self.mode_var, self.output_var, self.recursive_var, self.sub_var,
+                          self.lang_var, self.force_var, self.start_var]:
+             variable.trace_add('write', self.settings_changed)
+@@ -947,7 +974,7 @@
+         if subtitle is not None:
+             self.empty_sub_var.set(subtitle)
+         if visible:
+-            self.empty_state.place(relx=0.5, rely=0.5, anchor='center', width=390, height=170)
++            self.empty_state.place(relx=0.5, rely=0.52, anchor='center', width=344, height=132)
+             self.empty_state.lift()
+         else:
+             self.empty_state.place_forget()
+@@ -970,7 +997,32 @@
+         if hasattr(self, 'footer_state_label'):
+             self.footer_state_label.configure(fg=fg)
+ 
++    def _update_conditional_rows(self):
++        """Keep the default window compact; reveal advanced rows only when needed."""
++        if hasattr(self, 'template_entry'):
++            custom = self.template_name_var.get() == '自定义'
++            if custom:
++                self.template_label.grid(row=3, column=0, sticky='w', padx=(0, 8), pady=4)
++                self.template_entry.grid(row=3, column=1, columnspan=5, sticky='ew', pady=4)
++                self.template_hint.grid(row=3, column=6, sticky='w', padx=(8, 0))
++            else:
++                self.template_label.grid_remove()
++                self.template_entry.grid_remove()
++                self.template_hint.grid_remove()
++            self.template_entry.configure(state='normal' if custom else 'disabled')
++        if hasattr(self, 'output_entry'):
++            copy_mode = self.mode_var.get() != '原地重命名'
++            if copy_mode:
++                self.output_label.grid(row=4, column=2, sticky='w', padx=(0, 8), pady=4)
++                self.output_entry.grid(row=4, column=3, columnspan=3, sticky='ew')
++                self.output_button.grid(row=4, column=6, padx=(8, 0))
++            else:
++                self.output_label.grid_remove()
++                self.output_entry.grid_remove()
++                self.output_button.grid_remove()
++
+     def settings_changed(self, *_):
++        self._update_conditional_rows()
+         if self.folder_var.get() != self.source_context:
+             self.groups.clear()
+             self.overrides.clear()
+@@ -996,7 +1048,7 @@
+         name = self.template_name_var.get()
+         if name != '自定义':
+             self.template_var.set(TEMPLATES[name])
+-        self.template_entry.configure(state='normal' if name == '自定义' else 'disabled')
++        self._update_conditional_rows()
+ 
+     def _controls(self, widget):
+         for child in widget.winfo_children():
