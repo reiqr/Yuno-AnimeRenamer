@@ -212,17 +212,22 @@ class ThemeMixin:
             veil_fill, veil_stipple = '#150B13', 'gray25'
         else:
             banner = getattr(self, 'banner_dark_photo_wide', None) if width >= 840 else getattr(self, 'banner_dark_photo', None)
-            veil_fill, veil_stipple = '#120A11', 'gray25'
+            veil_fill, veil_stipple = '#09070B', 'gray50'
         if banner:
             canvas.create_image(0, 0, image=banner, anchor='nw', tags='overlay')
-        # Softer readable veil: keep the art visible instead of turning the whole strip nearly black.
         height = max(82, canvas.winfo_height())
+        # Dark states deliberately mute the complete artwork. This makes WAITING / dirty /
+        # review / conflict visually distinct instead of looking like the ready-state banner.
+        if variant == 'dark':
+            canvas.create_rectangle(0, 0, width, height, fill='#09070B', stipple='gray50',
+                                    outline='', tags='overlay')
+        # Keep an additional readability veil behind the right-side title copy.
         canvas.create_rectangle(max(420, int(width * 0.52)), 0, width, height,
                                 fill=veil_fill, stipple=veil_stipple, outline='', tags='overlay')
         tx = max(470, int(width * 0.58))
-        title_fill = '#FFF5F9' if variant == 'bright' else '#FFF2F7'
-        subtitle_fill = '#FF79AE' if variant == 'bright' else '#FF6EA3'
-        step_fill = '#D8CFD4' if variant == 'bright' else '#C9BCC5'
+        title_fill = '#FFF5F9' if variant == 'bright' else '#CFC3CA'
+        subtitle_fill = '#FF79AE' if variant == 'bright' else '#B84D76'
+        step_fill = '#D8CFD4' if variant == 'bright' else '#8E838B'
         canvas.create_text(tx, 17, text='ANIME RENAMER', anchor='w', fill=title_fill,
                            font=(self.FONTS['latin'], 17, 'bold'), tags='overlay')
         canvas.create_text(tx, 37, text='未来日记 · RENAME TERMINAL', anchor='w', fill=subtitle_fill,
@@ -231,9 +236,9 @@ class ThemeMixin:
                            font=(self.FONTS['mono'], 7, 'bold'), tags='overlay')
         line_y = min(height - 8, 70)
         canvas.create_line(tx, line_y, min(width - 24, tx + 170), line_y,
-                           fill='#FF4F91', width=2, tags='overlay')
+                           fill='#FF4F91' if variant == 'bright' else '#8B3154', width=2, tags='overlay')
         canvas.create_line(min(width - 24, tx + 170), line_y, min(width - 24, tx + 280), line_y,
-                           fill='#38D6D0', width=2, tags='overlay')
+                           fill='#38D6D0' if variant == 'bright' else '#245F60', width=2, tags='overlay')
         canvas.create_rectangle(0, height - 3, width, height, fill='#0A080D', outline='', tags='overlay')
         canvas.create_line(0, height - 3, min(width, int(width * 0.38)), height - 3, fill='#8C2B59', width=1, tags='overlay')
         canvas.create_line(max(0, int(width * 0.72)), height - 3, width, height - 3, fill='#245A5A', width=1, tags='overlay')

@@ -389,12 +389,23 @@ class LightNovelMixin:
     def _build_ui(self):
         super()._build_ui()
         self.content_type_var = tk.StringVar(value='番剧')
-        toolbar = self.run_btn.master
-        ttk.Label(toolbar, text='内容', style='Cyan.TLabel').pack(side='left', padx=(10, 4))
+
+        # The content selector belongs to the file-source settings rather than the crowded
+        # action toolbar. Reserve a dedicated area in the source-card header so both
+        # “番剧” and “轻小说” remain fully visible at the normal application width.
+        form_card = self.mode_combo.master
+        for widget in form_card.winfo_children():
+            if isinstance(widget, ttk.Label) and str(widget.cget('text')) == '01  日记源 / FILE SOURCE':
+                widget.grid_configure(columnspan=4)
+                break
+        self.content_type_frame = ttk.Frame(form_card, style='Panel.TFrame')
+        self.content_type_frame.grid(row=0, column=4, columnspan=3, sticky='e', pady=(0, 4))
+        ttk.Label(self.content_type_frame, text='内容', style='Cyan.TLabel').pack(
+            side='left', padx=(0, 6))
         self.content_type_combo = ttk.Combobox(
-            toolbar, values=['番剧', '轻小说'], textvariable=self.content_type_var,
-            state='readonly', width=7)
-        self.content_type_combo.pack(side='left', padx=(0, 6))
+            self.content_type_frame, values=['番剧', '轻小说'], textvariable=self.content_type_var,
+            state='readonly', width=9)
+        self.content_type_combo.pack(side='left')
         self.content_type_combo.bind('<<ComboboxSelected>>', self.on_content_type_change)
         self._template_combo = self._find_template_combo()
         self.content_type_var.trace_add('write', self._novel_mode_dirty)
