@@ -1,0 +1,172 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.230910293 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.233726613 +0000
+@@ -22,6 +22,61 @@
+ }
+ 
+ 
++class ThemeToggle(tk.Checkbutton):
++    """Pill-like Boolean toggle that also exposes ttk-style state() for busy locking."""
++    def __init__(self, master, *, text, variable, colors, font):
++        self._colors = colors
++        super().__init__(
++            master, text=text, variable=variable, indicatoron=False,
++            relief='flat', bd=0, highlightthickness=1, padx=11, pady=5,
++            anchor='center', cursor='hand2', font=font,
++            bg=colors['off_bg'], fg=colors['off_fg'],
++            activebackground=colors['hover_bg'], activeforeground=colors['on_fg'],
++            selectcolor=colors['on_bg'],
++            highlightbackground=colors['border'], highlightcolor=colors['accent'],
++            disabledforeground=colors['disabled_fg'],
++        )
++        variable.trace_add('write', self._sync_visual)
++        self.bind('<Enter>', self._enter, add='+')
++        self.bind('<Leave>', self._leave, add='+')
++        self._sync_visual()
++
++    def _selected(self):
++        try:
++            return bool(self.cget('variable') and self.getvar(self.cget('variable')))
++        except tk.TclError:
++            return False
++
++    def _sync_visual(self, *_):
++        if str(self.cget('state')) == 'disabled':
++            return
++        selected = self._selected()
++        self.configure(
++            bg=self._colors['on_bg'] if selected else self._colors['off_bg'],
++            fg=self._colors['on_fg'] if selected else self._colors['off_fg'],
++            highlightbackground=self._colors['accent'] if selected else self._colors['border'],
++        )
++
++    def _enter(self, _event=None):
++        if str(self.cget('state')) != 'disabled':
++            self.configure(bg=self._colors['hover_bg'])
++
++    def _leave(self, _event=None):
++        self._sync_visual()
++
++    def state(self, spec=None):
++        current = ('disabled',) if str(self.cget('state')) == 'disabled' else ()
++        if spec is None:
++            return current
++        for token in spec:
++            if token == 'disabled':
++                self.configure(state='disabled', cursor='arrow', bg=self._colors['disabled_bg'])
++            elif token == '!disabled':
++                self.configure(state='normal', cursor='hand2')
++                self._sync_visual()
++        return current
++
++
+ class GroupDialog(simpledialog.Dialog):
+@@ -577,11 +632,11 @@
+             ttk.Label(form_card, text=text, style='MutedPanel.TLabel').grid(row=row, column=col, sticky='w', padx=(0, 8), pady=5)
+ 
+         field_label('输入文件夹', 1, 0)
+-        ttk.Entry(form_card, textvariable=self.folder_var).grid(row=1, column=1, columnspan=5, sticky='ew', pady=5)
++        ttk.Entry(form_card, textvariable=self.folder_var).grid(row=1, column=1, columnspan=5, sticky='ew', pady=6, padx=(0, 2))
+         ttk.Button(form_card, text='BROWSE · 浏览', command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
+ 
+         field_label('作品名称', 2, 0)
+-        ttk.Entry(form_card, textvariable=self.title_var, width=26).grid(row=2, column=1, sticky='ew', pady=5)
++        ttk.Entry(form_card, textvariable=self.title_var, width=26).grid(row=2, column=1, sticky='ew', pady=6, padx=(0, 8))
+@@ -604,12 +659,22 @@
+         ttk.Button(form_card, text='SELECT · 选择', command=self.choose_output, style='Ghost.TButton').grid(row=4, column=6, padx=(8, 0))
+ 
+         opts = ttk.Frame(form_card, style='Panel.TFrame')
+-        opts.grid(row=5, column=0, columnspan=7, sticky='w', pady=(10, 2))
+-        for text, variable in [('包含子文件夹', self.recursive_var), ('联动字幕', self.sub_var),
+-                               ('保留字幕语言', self.lang_var), ('每组全部正片按排序编号', self.force_var)]:
+-            ttk.Checkbutton(opts, text=text, variable=variable, style='Option.TCheckbutton').pack(side='left', padx=(0, 14))
+-        ttk.Label(opts, text='起始集', style='MutedPanel.TLabel').pack(side='left')
+-        ttk.Spinbox(opts, from_=1, to=9999, textvariable=self.start_var, width=6).pack(side='left', padx=6)
++        opts.grid(row=5, column=0, columnspan=7, sticky='ew', pady=(11, 3))
++        ttk.Label(opts, text='OPTIONS', style='Cyan.TLabel').pack(side='left', padx=(0, 10))
++        toggle_colors = {
++            'off_bg': '#1B1620', 'off_fg': '#B7A9B3', 'on_bg': '#46203A', 'on_fg': '#FFF3F8',
++            'hover_bg': '#352031', 'border': '#493544', 'accent': c['pink'],
++            'disabled_bg': '#17141A', 'disabled_fg': '#6E636B',
++        }
++        self.option_toggles = []
++        for text, variable in [('子文件夹', self.recursive_var), ('字幕联动', self.sub_var),
++                               ('保留语言标签', self.lang_var), ('按排序强制编号', self.force_var)]:
++            toggle = ThemeToggle(opts, text=text, variable=variable, colors=toggle_colors,
++                                 font=(self.FONTS['body'], 8, 'bold'))
++            toggle.pack(side='left', padx=(0, 8))
++            self.option_toggles.append(toggle)
++        ttk.Label(opts, text='起始集', style='MutedPanel.TLabel').pack(side='left', padx=(6, 4))
++        ttk.Spinbox(opts, from_=1, to=9999, textvariable=self.start_var, width=6).pack(side='left')
+@@ -641,10 +706,13 @@
+-        self.tree.tag_configure('ready', foreground='#7CF6D9')
+-        self.tree.tag_configure('warning', foreground=c['warning'])
+-        self.tree.tag_configure('error', foreground=c['error'])
+-        self.tree.tag_configure('skipped', foreground='#746B73')
++        self.tree.tag_configure('group', background='#1A141D', foreground='#FFB5CF', font=(self.FONTS['body'], 9, 'bold'))
++        self.tree.tag_configure('ready', foreground='#7CF6D9', background='#101918')
++        self.tree.tag_configure('warning', foreground='#FFD194', background='#1C1710')
++        self.tree.tag_configure('error', foreground='#FF8A97', background='#211116')
++        self.tree.tag_configure('skipped', foreground='#81757E', background='#121014')
++        self.tree.tag_configure('hover', background='#2B1B29')
+@@ -656,6 +724,10 @@
+         self.tree.bind('<Double-1>', lambda e: self.edit_item())
+         self.tree.bind('<space>', lambda e: self.toggle_skip())
+         self.tree.bind('<<TreeviewSelect>>', self.show_detail)
++        self.tree.bind('<Motion>', self._on_tree_motion, add='+')
++        self.tree.bind('<Leave>', self._on_tree_leave, add='+')
++        self.tree.bind('<Configure>', self._resize_tree_columns, add='+')
++        self._hover_iid = None
+@@ -682,7 +754,7 @@
+-        self.detail_var = tk.StringVar(value='待确认的文件不会执行。若识别不正确，请双击对应文件进行纠正。')
++        self.detail_var = tk.StringVar(value='待确认的文件不会执行。悬停查看识别依据；双击文件可以纠正集数或特别篇。')
+@@ -704,6 +776,56 @@
++    def _resize_tree_columns(self, _event=None):
++        if not hasattr(self, 'tree'):
++            return
++        width = max(760, self.tree.winfo_width() - 8)
++        specs = {'#0': (0.15, 120), 'kind': (0.07, 58), 'old': (0.25, 180), 'detected': (0.11, 92), 'new': (0.25, 180), 'status': (0.17, 145)}
++        for col, (ratio, minimum) in specs.items():
++            try:
++                self.tree.column(col, width=max(minimum, int(width * ratio)), minwidth=minimum)
++            except tk.TclError:
++                pass
++
++    def _on_tree_motion(self, event):
++        iid = self.tree.identify_row(event.y)
++        if iid == self._hover_iid:
++            return
++        self._clear_tree_hover()
++        if not iid:
++            return
++        tags = list(self.tree.item(iid, 'tags'))
++        if 'hover' not in tags:
++            tags.append('hover')
++            self.tree.item(iid, tags=tuple(tags))
++        self._hover_iid = iid
++        if iid.startswith('r'):
++            try:
++                item = self.plan[int(iid[1:])]
++                self.detail_var.set(f'悬停预览 · {item.reason}（规则评分 {item.confidence}/100）')
++            except (ValueError, IndexError):
++                pass
++        elif iid in self.group_nodes:
++            self.detail_var.set('分组行 · 单击可选择整组，使用 GROUP 按钮设置该组的作品名、季度或起始集。')
++
++    def _clear_tree_hover(self):
++        iid = getattr(self, '_hover_iid', None)
++        if iid and self.tree.exists(iid):
++            tags = tuple(tag for tag in self.tree.item(iid, 'tags') if tag != 'hover')
++            self.tree.item(iid, tags=tags)
++        self._hover_iid = None
++
++    def _on_tree_leave(self, _event=None):
++        self._clear_tree_hover()
++        if self.tree.selection():
++            self.show_detail()
++        else:
++            self.detail_var.set('待确认的文件不会执行。悬停查看识别依据；双击文件可以纠正集数或特别篇。')
+@@ -751,7 +873,7 @@
+     def _controls(self, widget):
+         for child in widget.winfo_children():
+-            if isinstance(child, (ttk.Entry, ttk.Button, ttk.Checkbutton, ttk.Combobox, ttk.Spinbox)):
++            if isinstance(child, (ttk.Entry, ttk.Button, ttk.Checkbutton, ttk.Combobox, ttk.Spinbox, ThemeToggle)):
