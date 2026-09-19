@@ -1,0 +1,149 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.231508446 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.232342585 +0000
+@@ -569,20 +569,21 @@
+         style.configure('Cyan.TLabel', background=c['panel2'], foreground=c['cyan'],
+                         font=(self.FONTS['mono'], 8, 'bold'))
+ 
+-        style.configure('TEntry', padding=8, relief='flat', borderwidth=1,
++        style.configure('TEntry', padding=(9, 7), relief='flat', borderwidth=1,
+                         foreground=c['text'], fieldbackground=c['panel3'],
+-                        insertcolor=c['pink'])
++                        insertcolor=c['pink'], font=(self.FONTS['body'], 9))
+         style.map('TEntry', fieldbackground=[('disabled', '#17131A')],
+                   foreground=[('disabled', '#706670')])
+-        style.configure('TCombobox', padding=8, arrowsize=13, relief='flat', borderwidth=1,
++        style.configure('TCombobox', padding=(9, 7), arrowsize=12, relief='flat', borderwidth=1,
+                         foreground=c['text'], fieldbackground=c['panel3'], arrowcolor=c['pink'],
+-                        bordercolor='#5A3146', lightcolor='#5A3146', darkcolor='#5A3146')
++                        bordercolor='#5A3146', lightcolor='#5A3146', darkcolor='#5A3146',
++                        font=(self.FONTS['body'], 9))
+         style.map('TCombobox', fieldbackground=[('readonly', c['panel3'])],
+                   selectbackground=[('readonly', c['panel3'])],
+                   selectforeground=[('readonly', c['text'])])
+-        style.configure('TSpinbox', padding=8, arrowsize=11, relief='flat', borderwidth=1,
++        style.configure('TSpinbox', padding=(9, 7), arrowsize=10, relief='flat', borderwidth=1,
+                         foreground=c['text'], fieldbackground=c['panel3'],
+-                        arrowcolor=c['pink'])
++                        arrowcolor=c['pink'], font=(self.FONTS['body'], 9))
+@@ -627,11 +628,11 @@
+-        style.configure('Treeview', rowheight=30, relief='flat', borderwidth=0,
++        style.configure('Treeview', rowheight=28, relief='flat', borderwidth=0,
+                         background='#121017', fieldbackground='#121017', foreground='#EDE5EC',
+                         font=(self.FONTS['body'], 9))
+         style.configure('Treeview.Heading', background='#211923', foreground='#F7EAF3',
+-                        relief='flat', borderwidth=0, padding=(10, 9), font=(self.FONTS['body'], 9, 'bold'))
++                        relief='flat', borderwidth=0, padding=(10, 8), font=(self.FONTS['body'], 9, 'bold'))
+@@ -649,7 +650,12 @@
+         sidebar = ttk.Frame(shell, style='Sidebar.TFrame', width=236)
+         sidebar.pack(side='left', fill='y')
+         sidebar.pack_propagate(False)
+-        main = ttk.Frame(shell, style='App.TFrame', padding=(14, 10, 14, 10))
++        # A slim dual-tone rail separates artwork from the working surface.
++        side_rail = tk.Canvas(shell, width=2, bg='#251620', bd=0, highlightthickness=0)
++        side_rail.pack(side='left', fill='y')
++        side_rail.create_line(0, 0, 0, 10000, fill='#7A2B52', width=1)
++        side_rail.create_line(1, 0, 1, 10000, fill='#24575A', width=1)
++        main = ttk.Frame(shell, style='App.TFrame', padding=(13, 9, 13, 9))
+@@ -709,9 +715,10 @@
+-        form_card = ttk.Frame(form_outer, style='Panel.TFrame', padding=(11, 7))
++        form_card = ttk.Frame(form_outer, style='Panel.TFrame', padding=(11, 6))
+         form_card.pack(fill='x', padx=1, pady=(0, 1))
+-        ttk.Label(form_card, text='01  日记源 / FILE SOURCE', style='Section.TLabel').grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 5))
++        self._clip_card_corners(form_outer, c['bg'], 4)
++        ttk.Label(form_card, text='01  日记源 / FILE SOURCE', style='Section.TLabel').grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 4))
+@@ -787,8 +794,8 @@
+-        toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(9, 6))
+-        toolbar.pack(fill='x', pady=(7, 7))
++        toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(9, 5))
++        toolbar.pack(fill='x', pady=(6, 6))
+@@ -802,10 +809,11 @@
+-        preview_card = ttk.Frame(preview_outer, style='Panel.TFrame', padding=(8, 7))
++        preview_card = ttk.Frame(preview_outer, style='Panel.TFrame', padding=(8, 6))
+         preview_card.pack(fill='both', expand=True, padx=1, pady=(0, 1))
++        self._clip_card_corners(preview_outer, c['bg'], 4)
+         preview_head = ttk.Frame(preview_card, style='Panel.TFrame')
+-        preview_head.pack(fill='x', pady=(0, 7))
++        preview_head.pack(fill='x', pady=(0, 5))
+@@ -825,11 +833,18 @@
+-        self.tree.tag_configure('ready', foreground='#7CF6D9', background='#101918')
+-        self.tree.tag_configure('warning', foreground='#FFD194', background='#1C1710')
+-        self.tree.tag_configure('error', foreground='#FF8A97', background='#211116')
+-        self.tree.tag_configure('skipped', foreground='#81757E', background='#121014')
+-        self.tree.tag_configure('hover', background='#2B1B29')
++        stripe_colors = {
++            'ready': ('#101918', '#121D1B', '#7CF6D9'), 'warning': ('#1C1710', '#211A11', '#FFD194'),
++            'error': ('#211116', '#261318', '#FF8A97'), 'skipped': ('#121014', '#151217', '#81757E'),
++            'neutral': ('#121017', '#151219', '#D8CDD5'),
++        }
++        for name, (even_bg, odd_bg, fg) in stripe_colors.items():
++            self.tree.tag_configure(f'{name}_even', foreground=fg, background=even_bg)
++            self.tree.tag_configure(f'{name}_odd', foreground=fg, background=odd_bg)
++        self.tree.tag_configure('hover', background='#2B1B29', foreground='#FFFFFF')
+@@ -850,40 +865,39 @@
+-        self.empty_state = tk.Frame(preview, bg='#17131B', bd=0, highlightthickness=1,
+-                                    highlightbackground='#493340', highlightcolor='#493340')
+-        self.empty_state.place(relx=0.5, rely=0.52, anchor='center', width=344, height=132)
+-        tk.Frame(self.empty_state, bg='#8E2C59', height=2, bd=0).pack(fill='x')
+-        empty_canvas = tk.Canvas(self.empty_state, width=72, height=100, bg='#17131B',
++        self.empty_state = tk.Frame(preview, bg='#121017', bd=0, highlightthickness=0)
++        self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=326, height=112)
++        empty_canvas = tk.Canvas(self.empty_state, width=64, height=88, bg='#121017',
+                                  highlightthickness=0, bd=0)
+-        empty_canvas.pack(side='left', padx=(14, 14), pady=(14, 10))
+-        empty_canvas.create_rectangle(13, 5, 59, 91, outline='#644052', width=2)
+-        empty_canvas.create_rectangle(18, 14, 54, 64, outline='#2D6B6B', fill='#121017', width=1)
+-        empty_canvas.create_text(36, 38, text='♥', fill=c['pink'], font=(self.FONTS['body'], 17, 'bold'))
+-        empty_canvas.create_line(23, 73, 49, 73, fill='#38D6D0', width=2)
+-        empty_canvas.create_oval(33, 80, 39, 86, outline='#8F7183', width=1)
+-        empty_text = tk.Frame(self.empty_state, bg='#17131B')
+-        empty_text.pack(side='left', fill='both', expand=True, pady=(20, 12), padx=(0, 12))
++        empty_canvas.pack(side='left', padx=(10, 12), pady=(10, 8))
++        empty_canvas.create_rectangle(13, 4, 53, 82, outline='#4D3A47', width=1)
++        empty_canvas.create_rectangle(17, 12, 49, 58, outline='#24575A', fill='#0F0D12', width=1)
++        empty_canvas.create_text(33, 34, text='♥', fill=c['pink'], font=(self.FONTS['body'], 17, 'bold'))
++        empty_canvas.create_line(22, 66, 44, 66, fill='#38D6D0', width=1)
++        empty_canvas.create_oval(30, 72, 36, 78, outline='#715C69', width=1)
++        empty_text = tk.Frame(self.empty_state, bg='#121017')
++        empty_text.pack(side='left', fill='both', expand=True, pady=(14, 8), padx=(0, 8))
+@@ -891,12 +905,13 @@
+-        detail_outer = tk.Frame(main, bg='#2F3539', bd=0, highlightthickness=0)
++        detail_outer = tk.Frame(main, bg='#263336', bd=0, highlightthickness=0)
+         detail_outer.pack(fill='x', pady=(6, 0))
+-        detail_card = ttk.Frame(detail_outer, style='Card.TFrame', padding=(10, 6))
++        detail_card = ttk.Frame(detail_outer, style='Card.TFrame', padding=(10, 5))
+         detail_card.pack(fill='x', padx=1, pady=1)
++        self._clip_card_corners(detail_outer, c['bg'], 3)
+@@ -902,7 +917,7 @@
+-        footer.pack(fill='x', pady=(7, 0))
++        footer.pack(fill='x', pady=(6, 0))
+@@ -916,6 +931,21 @@
++    def _clip_card_corners(self, frame, outside=None, size=4):
++        if outside is None:
++            outside = self.COLORS.get('bg', '#0D0B11')
++        corners = [dict(x=0, y=0, anchor='nw'), dict(relx=1, y=0, anchor='ne'),
++                   dict(x=0, rely=1, anchor='sw'), dict(relx=1, rely=1, anchor='se')]
++        for spec in corners:
++            chip = tk.Frame(frame, bg=outside, width=size, height=size, bd=0, highlightthickness=0)
++            chip.place(**spec); chip.lift()
+@@ -974,7 +1004,7 @@
+-            self.empty_state.place(relx=0.5, rely=0.52, anchor='center', width=344, height=132)
++            self.empty_state.place(relx=0.5, rely=0.53, anchor='center', width=326, height=112)
+@@ -1132,15 +1162,17 @@
+             status = item.status
+             if status.startswith(('冲突', '错误')):
+-                tag, shown_status = 'error', '!!  ' + status
++                base_tag, shown_status = 'error', '!!  ' + status
+             elif status.startswith('待'):
+-                tag, shown_status = 'warning', '?   ' + status
++                base_tag, shown_status = 'warning', '?   ' + status
+             elif status == '已跳过':
+-                tag, shown_status = 'skipped', '--  已跳过'
++                base_tag, shown_status = 'skipped', '--  已跳过'
+             elif status == READY:
+-                tag, shown_status = 'ready', 'OK  可执行'
++                base_tag, shown_status = 'ready', 'OK  可执行'
+             else:
+-                tag, shown_status = '', status
++                base_tag, shown_status = 'neutral', status
++            stripe = 'even' if index % 2 == 0 else 'odd'
++            tag = f'{base_tag}_{stripe}'
