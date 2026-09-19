@@ -46,6 +46,7 @@ Earlier work (Preview 1–3 / theme baseline) is already represented by normal r
 - Preview 13 ZIP: `afde1b03988c687f0ffae3986feee385ef91411fa356c35ff2b8b1d35fa34e17`
 - Preview 14 ZIP: `e1ae1a4df4fd180163a3fa92ae6687edc343f475c74603558d8770767b3caddc`
 - Preview 15 ZIP: `e68c56a44d37a5259e3fca818dd05697f053ae06a5704bf6dd3fd4234b8597a0`
+- Preview 16 ZIP: `110528f0e6789c098a486297d07723c95f80e3597df023fefedef865f20c3580`
 
 ## Notes
 
