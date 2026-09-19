@@ -1,0 +1,125 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.232654405 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.233359679 +0000
+@@ -153,6 +153,9 @@
+         self.busy, self.dirty = False, True
+         self.source_context = ''
+         self.group_nodes = {}
++        self._busy_anim_id = None
++        self._busy_anim_step = 0
++        self._status_mode = 'neutral'
+         self._build_ui()
+@@ -170,9 +173,9 @@
+         sw = max(1024, self.winfo_screenwidth())
+         sh = max(720, self.winfo_screenheight())
+         width = min(1240, max(1020, int(sw * 0.72)))
+-        height = min(760, max(640, int(sh * 0.72)))
++        height = min(760, max(690, int(sh * 0.82)))
+         width = min(width, max(980, sw - 70))
+-        height = min(height, max(610, sh - 90))
++        height = min(height, max(620, sh - 60))
+@@ -624,6 +627,11 @@
++        style.configure('Secondary.TButton', background='#231923', foreground='#EEDCE7', bordercolor='#68405A',
++                        lightcolor='#68405A', darkcolor='#68405A', padding=(9, 7))
++        style.map('Secondary.TButton', background=[('pressed', '#1B121B'), ('active', '#352234'), ('disabled', '#17141A')],
++                  foreground=[('pressed', '#FFFFFF'), ('active', '#FFFFFF'), ('disabled', '#655C65')],
++                  bordercolor=[('active', '#A44A76'), ('pressed', '#7C365B')])
+@@ -633,7 +641,7 @@
+-                        relief='flat', borderwidth=0, padding=(10, 8), font=(self.FONTS['body'], 9, 'bold'))
++                        relief='flat', borderwidth=0, padding=(5, 7), font=(self.FONTS['body'], 8, 'bold'))
+@@ -673,22 +681,19 @@
+-        side_text = ttk.Frame(sidebar, style='Sidebar.TFrame', padding=(17, 9, 16, 15))
++        side_text = ttk.Frame(sidebar, style='Sidebar.TFrame', padding=(17, 9, 16, 14))
+@@
+-        ttk.Label(side_text, text='MIRAI NIKKI  /  RENAME TERMINAL', style='HeroSub.TLabel').pack(anchor='w', pady=(2, 12))
++        ttk.Label(side_text, text='MIRAI NIKKI  /  RENAME TERMINAL', style='HeroSub.TLabel').pack(anchor='w', pady=(2, 9))
+@@
+-        ttk.Label(side_text, text='文件名的未来，由你确认后再改写。', style='SidebarMuted.TLabel',
+-                  font=(self.FONTS['body'], 9), justify='left').pack(anchor='w', pady=(5, 13))
+-        ttk.Separator(side_text, orient='horizontal').pack(fill='x', pady=(2, 10))
+-        ttk.Label(side_text, text='DIARY FLOW', style='HeroSub.TLabel').pack(anchor='w', pady=(0, 5))
+-        ttk.Label(side_text, text='01  SCAN     读取文件', style='SidebarMuted.TLabel',
+-                  font=(self.FONTS['mono'], 8, 'bold')).pack(anchor='w', pady=1)
+-        ttk.Label(side_text, text='02  CHECK    校对未来', style='SidebarMuted.TLabel',
+-                  font=(self.FONTS['mono'], 8, 'bold')).pack(anchor='w', pady=1)
+-        ttk.Label(side_text, text='03  REWRITE  执行改名', style='SidebarMuted.TLabel',
+-                  font=(self.FONTS['mono'], 8, 'bold')).pack(anchor='w', pady=1)
++        ttk.Label(side_text, text='确认预览，再改写文件名。', style='SidebarMuted.TLabel',
++                  font=(self.FONTS['body'], 8), justify='left').pack(anchor='w', pady=(4, 10))
++        ttk.Separator(side_text, orient='horizontal').pack(fill='x', pady=(1, 8))
++        ttk.Label(side_text, text='01 SCAN  ·  02 CHECK  ·  03 REWRITE', style='HeroSub.TLabel',
++                  font=(self.FONTS['mono'], 7, 'bold')).pack(anchor='w')
++        ttk.Label(side_text, text='读取  →  校对  →  执行', style='SidebarMuted.TLabel',
++                  font=(self.FONTS['body'], 8)).pack(anchor='w', pady=(4, 0))
+@@ -703,6 +708,8 @@
+         self.chrome_state_label.grid(row=0, column=2, sticky='e')
++        self.chrome_status_line = tk.Frame(chrome, bg='#3A3239', height=2, bd=0)
++        self.chrome_status_line.grid(row=1, column=0, columnspan=3, sticky='ew', pady=(5, 0))
+@@ -716,7 +723,8 @@
+-        tk.Frame(form_outer, bg='#7B2C52', height=2, bd=0).pack(fill='x')
++        self.form_status_line = tk.Frame(form_outer, bg='#7B2C52', height=2, bd=0)
++        self.form_status_line.pack(fill='x')
+@@ -740,16 +748,16 @@
+-        field_label('输入文件夹', 1, 0, 'folder')
++        field_label('文件夹', 1, 0, 'folder')
+@@
+-        field_label('作品名称', 2, 0, 'title')
++        field_label('作品', 2, 0, 'title')
+@@
+-        field_label('命名规则', 2, 4, 'rule')
++        field_label('规则', 2, 4, 'rule')
+@@
+-        field_label('操作方式', 4, 0, 'mode')
++        field_label('模式', 4, 0, 'mode')
+@@ -783,8 +791,8 @@
+-        for text, variable in [('子文件夹', self.recursive_var), ('字幕联动', self.sub_var),
+-                               ('保留语言标签', self.lang_var), ('按排序强制编号', self.force_var)]:
++        for text, variable in [('子目录', self.recursive_var), ('字幕联动', self.sub_var),
++                               ('语言标签', self.lang_var), ('排序编号', self.force_var)]:
+@@ -795,29 +803,57 @@
+-        toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(9, 5))
+-        toolbar.pack(fill='x', pady=(6, 6))
+-        ttk.Button(toolbar, text='分组设置', image=self.UI_ICONS['group'], compound='left', command=self.edit_group, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='纠正集数', image=self.UI_ICONS['edit'], compound='left', command=self.edit_item, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='跳过 / 恢复', image=self.UI_ICONS['skip'], compound='left', command=self.toggle_skip, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Button(toolbar, text='清除纠正', image=self.UI_ICONS['reset'], compound='left', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+-        ttk.Label(toolbar, text='双击文件纠正 · 空格切换跳过', style='Muted.TLabel').pack(side='right')
++        toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(8, 4))
++        toolbar.pack(fill='x', pady=(6, 5))
++        ttk.Button(toolbar, text='分组', image=self.UI_ICONS['group'], compound='left', command=self.edit_group, style='Secondary.TButton').pack(side='left', padx=(0, 6))
++        ttk.Button(toolbar, text='纠正', image=self.UI_ICONS['edit'], compound='left', command=self.edit_item, style='Secondary.TButton').pack(side='left', padx=(0, 6))
++        ttk.Button(toolbar, text='跳过', image=self.UI_ICONS['skip'], compound='left', command=self.toggle_skip, style='Secondary.TButton').pack(side='left', padx=(0, 6))
++        ttk.Button(toolbar, text='清除', image=self.UI_ICONS['reset'], compound='left', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 6))
++        self.run_btn = ttk.Button(toolbar, text='改写未来', image=self.UI_ICONS['run'], compound='left',
++                                  command=self.execute, state='disabled', style='Primary.TButton')
++        self.run_btn.pack(side='right')
++        self.undo_btn = ttk.Button(toolbar, text='', image=self.UI_ICONS['undo'], command=self.undo,
++                                   style='Danger.TButton')
++        self.undo_btn.pack(side='right', padx=(0, 6))
++        self.recover_btn = ttk.Button(toolbar, text='', image=self.UI_ICONS['recover'], command=self.recover,
++                                      style='Ghost.TButton')
++        self.undo_btn.bind('<Enter>', lambda _e: self.detail_var.set('UNDO · 撤销上一次由本工具完成的操作。'))
++        self.recover_btn.bind('<Enter>', lambda _e: self.detail_var.set('RECOVER · 恢复检测到的中断操作。'))
++        self.undo_btn.bind('<Leave>', self._on_tree_leave)
++        self.recover_btn.bind('<Leave>', self._on_tree_leave)
++
++        self.detail_var = tk.StringVar(value='待确认的文件不会执行；悬停查看识别依据，双击可纠正集数。')
++        self.status_var = tk.StringVar(value='选择文件夹，填写作品名，然后扫描未来记录。')
++        info_rail = tk.Frame(main, bg='#121017', bd=0, highlightthickness=1, highlightbackground='#2A222B')
++        info_rail.pack(fill='x', pady=(0, 5))
++        tk.Label(info_rail, text='DIARY LOG', bg='#121017', fg=c['cyan'], padx=8, pady=4,
++                 font=(self.FONTS['mono'], 7, 'bold')).pack(side='left')
++        tk.Label(info_rail, textvariable=self.detail_var, bg='#121017', fg='#B9ABB5', anchor='w',
++                 font=(self.FONTS['body'], 8)).pack(side='left', fill='x', expand=True, padx=(0, 8))
++        tk.Label(info_rail, textvariable=self.status_var, bg='#121017', fg='#847983', anchor='e',
++                 font=(self.FONTS['mono'], 7)).pack(side='right', padx=(8, 8))
+@@ -826,11 +862,11 @@
+-        self.tree.heading('#0', text='GROUP  /  分组')
+-        self.tree.column('#0', width=170, minwidth=110)
+-        for col, label, width in [('kind', 'TYPE', 55), ('old', 'SOURCE NAME  /  原文件名', 255),
+-                                  ('detected', 'DETECTED', 105), ('new', 'TARGET NAME  /  目标文件名', 255),
+-                                  ('status', 'STATE  /  状态', 200)]:
++        self.tree.heading('#0', text='GROUP')
++        self.tree.column('#0', width=170, minwidth=80)
++        for col, label, width in [('kind', 'TYPE', 55), ('old', 'SOURCE / 原文件名', 255),
++                                  ('detected', 'MATCH', 105), ('new', 'TARGET / 目标文件名', 255),
++                                  ('status', 'STATE', 200)]:
