@@ -19,11 +19,6 @@ LANG_TAGS = [
     'jpn', 'jp', 'eng', 'en', 'chi', 'zho', '简中', '繁中', '简体', '繁体'
 ]
 
-BAD_NUMBERS = {
-    264, 265, 266, 480, 576, 720, 1080, 1440, 2160, 4320,
-    8, 10, 12, 16, 24, 25, 30, 50, 60, 120,
-}
-
 EXTRA_PATTERNS = [
     ('NCOP', re.compile(r'(?i)(?:^|[\s._\-\[\(])NC\s*OP(?:$|[\s._\-\]\)])')),
     ('NCED', re.compile(r'(?i)(?:^|[\s._\-\[\(])NC\s*ED(?:$|[\s._\-\]\)])')),
@@ -59,7 +54,36 @@ def natural_key(text: str):
 
 
 def _valid_episode(n: int) -> bool:
-    return 0 < n <= 999 and n not in BAD_NUMBERS
+    # Do not blacklist values such as 8/10/12/24/60: they are valid episode numbers.
+    # Technical numbers are filtered by their surrounding text instead.
+    return 0 < n <= 9999
+
+
+_TECHNICAL_TOKEN_PATTERNS = [
+    # Video codecs. These are the most dangerous because the trailing 264/265/266
+    # otherwise look exactly like a valid episode number.
+    re.compile(r'(?i)(?<![A-Za-z0-9])(?:x|h)\s*26[456](?!\d)'),
+    re.compile(r'(?i)(?<![A-Za-z0-9])(?:AVC|HEVC|H\.26[456]|X\.26[456])(?![A-Za-z0-9])'),
+    re.compile(r'(?i)(?<![A-Za-z0-9])(?:AV1|VP8|VP9)(?![A-Za-z0-9])'),
+    # Resolution / bit depth / frame rate / refresh rate / bit rate.
+    re.compile(r'(?i)(?<!\d)\d{3,4}\s*[x×]\s*\d{3,4}(?!\d)'),
+    re.compile(r'(?i)(?<!\d)\d{3,4}\s*[pi](?![A-Za-z])'),
+    re.compile(r'(?i)(?<!\d)\d+(?:\.\d+)?\s*(?:bit|fps|hz|kbps|mbps)(?![A-Za-z])'),
+]
+
+
+def _strip_technical_tokens(stem: str) -> str:
+    """Remove common release technical parameters before generic number matching.
+
+    Explicit episode forms (S01E03 / E03 / 第3集 / [03]) are parsed from the
+    original stem first. Generic trailing/standalone-number rules use this cleaned
+    string so x265, h264, 1080p, 10bit, 23.976fps, etc. cannot outrank a real
+    episode candidate.
+    """
+    cleaned = stem
+    for pat in _TECHNICAL_TOKEN_PATTERNS:
+        cleaned = pat.sub(' ', cleaned)
+    return re.sub(r'\s+', ' ', cleaned).strip()
 
 
 def detect_language_suffix(stem: str) -> str:
@@ -78,7 +102,18 @@ def detect_language_suffix(stem: str) -> str:
 
 
 def detect_episode(filename: str) -> Detection:
-    stem = Path(filename).stem
+    stem = Path(filename).stem.strip()
+
+    # Pure numeric file names are very common in anime folders: 01.mkv, 002.ass, etc.
+    # Give them the highest regular-episode confidence so mixed folders work reliably.
+    m = re.fullmatch(r'0*(\d{1,4})', stem)
+    if m:
+        try:
+            n = int(m.group(1))
+        except ValueError:
+            n = 0
+        if _valid_episode(n):
+            return Detection(episode=n, confidence=100, reason='纯数字文件名')
 
     for special, pat in EXTRA_PATTERNS:
         m = pat.search(stem)
@@ -102,35 +137,36 @@ def detect_episode(filename: str) -> Detection:
             candidates.append((score, n, reason))
 
     # S01E03 / S1.E3
-    for m in re.finditer(r'(?i)(?:^|[^A-Z0-9])S\s*0*\d{1,2}\s*[._\- ]*E(?:P(?:ISODE)?)?\s*0*(\d{1,3})(?:v\d+)?(?:\b|[^0-9])', stem):
+    for m in re.finditer(r'(?i)(?:^|[^A-Z0-9])S\s*0*\d{1,2}\s*[._\- ]*E(?:P(?:ISODE)?)?\s*0*(\d{1,4})(?:v\d+)?(?:\b|[^0-9])', stem):
         add(100, m.group(1), 'SxxEyy')
 
     # E03 / EP03 / Episode 03
-    for m in re.finditer(r'(?i)(?:^|[^A-Z0-9])E(?:P(?:ISODE)?)?\s*[._\- ]*0*(\d{1,3})(?:v\d+)?(?:\b|[^0-9])', stem):
+    for m in re.finditer(r'(?i)(?:^|[^A-Z0-9])E(?:P(?:ISODE)?)?\s*[._\- ]*0*(\d{1,4})(?:v\d+)?(?:\b|[^0-9])', stem):
         add(97, m.group(1), 'E/EP')
 
     # Chinese/Japanese episode words.
-    for m in re.finditer(r'(?:第\s*)?(\d{1,3})\s*(?:集|话|話|回)', stem):
+    for m in re.finditer(r'(?:第\s*)?(\d{1,4})\s*(?:集|话|話|回)', stem):
         add(99, m.group(1), '第xx集/话')
 
     # [03], (03), 【03】. Penalize codec/resolution-like bracket contents.
-    for m in re.finditer(r'[\[\(【]\s*0*(\d{1,3})(?:v\d+)?\s*[\]\)】]', stem):
+    for m in re.finditer(r'[\[\(【]\s*0*(\d{1,4})(?:v\d+)?\s*[\]\)】]', stem):
         add(88, m.group(1), '[xx]')
 
+    generic_stem = _strip_technical_tokens(stem)
+
     # Common release naming: " - 03 ", "_03_", ".03."
-    for m in re.finditer(r'(?:^|\s[-–—]\s|[._])0*(\d{1,3})(?:v\d+)?(?=$|[\s._\-\[])', stem):
+    for m in re.finditer(r'(?:^|\s[-–—]\s|[._])0*(\d{1,4})(?:v\d+)?(?=$|[\s._\-\[])', generic_stem):
         add(82, m.group(1), '分隔数字')
 
+    # Title immediately followed by an episode number, e.g. 未来日记01 / MiraiNikki02.
+    # Restrict this to the end of the stem to avoid treating codec/resolution numbers as episodes.
+    m = re.search(r'(?<!\d)0*(\d{1,4})(?:v\d+)?$', generic_stem)
+    if m and m.start() > 0:
+        add(90, m.group(1), '末尾集数')
+
     # Standalone 1-3 digit token. Reject likely technical values/year-adjacent values.
-    for m in re.finditer(r'(?<!\d)(\d{1,3})(?!\d)', stem):
+    for m in re.finditer(r'(?<!\d)(\d{1,3})(?!\d)', generic_stem):
         raw = m.group(1)
-        n = int(raw)
-        left = stem[max(0, m.start()-6):m.start()].lower()
-        right = stem[m.end():m.end()+8].lower()
-        if any(x in right for x in ('p', 'bit', 'fps', 'hz')):
-            continue
-        if any(x in left for x in ('x26', 'h26', 'hevc', 'avc')):
-            continue
         add(55, raw, '独立数字')
 
     if not candidates:
@@ -197,13 +233,15 @@ def build_plan(
             forced_map[str(p)] = ep
             ep += 1
 
-    # Map video base names to episode for subtitle association.
-    video_assoc: list[tuple[str, int]] = []
+    # Map each video to both its original detected episode and its final episode.
+    # In forced numbering mode subtitles must follow the video's FINAL number,
+    # even when the subtitle itself confidently contains the old episode number.
+    video_assoc: list[tuple[str, Optional[int], int]] = []
     for p in videos:
         det = detect_episode(p.name)
         ep = forced_map.get(str(p), det.episode)
         if ep is not None:
-            video_assoc.append((p.stem.lower(), ep))
+            video_assoc.append((p.stem.lower(), det.episode, ep))
 
     plan: list[RenameItem] = []
     proposed_targets: dict[str, int] = {}
@@ -224,14 +262,41 @@ def build_plan(
                 det = Detection(episode=ep, confidence=100, reason='强制排序编号')
 
         if kind == '字幕' and not special:
-            # If subtitle itself is uncertain, associate it with a video's stem.
-            if ep is None or det.confidence < 70:
-                low = p.stem.lower()
-                matches = [(base, vep) for base, vep in video_assoc if low == base or low.startswith(base + '.') or low.startswith(base + '_') or low.startswith(base + '-')]
-                if matches:
-                    matches.sort(key=lambda x: len(x[0]), reverse=True)
-                    ep = matches[0][1]
-                    det = Detection(episode=ep, confidence=95, reason='关联视频')
+            low = p.stem.lower()
+
+            # First choice: filename/base-name association. This also handles
+            # language suffixes such as Show.E03.chs.ass.
+            stem_matches = [
+                (base, final_ep)
+                for base, _original_ep, final_ep in video_assoc
+                if low == base
+                or low.startswith(base + '.')
+                or low.startswith(base + '_')
+                or low.startswith(base + '-')
+            ]
+            associated_ep: Optional[int] = None
+            if stem_matches:
+                stem_matches.sort(key=lambda x: len(x[0]), reverse=True)
+                associated_ep = stem_matches[0][1]
+
+            # Second choice: if the subtitle has an episode number, match it to
+            # a UNIQUE video's original episode number. This covers filenames
+            # such as "03.ass" paired with "Show E03.mkv".
+            if associated_ep is None and det.episode is not None:
+                episode_matches = {
+                    final_ep
+                    for _base, original_ep, final_ep in video_assoc
+                    if original_ep == det.episode
+                }
+                if len(episode_matches) == 1:
+                    associated_ep = next(iter(episode_matches))
+
+            # Forced numbering always follows the associated video. In normal
+            # mode, preserve a confident subtitle number and only use association
+            # as a fallback for uncertain/unrecognized subtitles.
+            if associated_ep is not None and (force_sequence or ep is None or det.confidence < 70):
+                ep = associated_ep
+                det = Detection(episode=ep, confidence=95, reason='关联视频')
 
         if ep is None and not special:
             plan.append(RenameItem(str(p), str(p), kind, det.reason or '未识别', det.confidence, '未识别，跳过'))
@@ -283,56 +348,86 @@ def _history_path() -> Path:
     return p / 'rename_history.json'
 
 
+def _norm_path(path: str | Path) -> str:
+    return os.path.normcase(os.path.abspath(str(path)))
+
+
+def _transactional_rename(pairs: list[tuple[Path, Path]], temp_prefix: str) -> tuple[bool, str]:
+    """Rename a batch atomically enough for local filesystem use.
+
+    Every source is first moved to a unique temporary path, then every temporary
+    path is moved to its destination. If either phase fails, all files that have
+    moved are staged again and restored to their original source names. The
+    second staging step is important for chains such as A->B, B->C.
+    """
+    records: list[dict] = []
+    try:
+        # Phase 1: vacate every source name so destination chains cannot collide.
+        for src, dst in pairs:
+            tmp = src.with_name(f'{temp_prefix}{uuid.uuid4().hex}{src.suffix}')
+            os.replace(src, tmp)
+            records.append({'src': src, 'dst': dst, 'tmp': tmp, 'location': 'tmp'})
+
+        # Phase 2: publish final names.
+        for rec in records:
+            rec['dst'].parent.mkdir(parents=True, exist_ok=True)
+            os.replace(rec['tmp'], rec['dst'])
+            rec['location'] = 'dst'
+        return True, ''
+
+    except Exception as exc:
+        rollback_errors: list[str] = []
+        staged: list[tuple[dict, Path]] = []
+
+        # Stage every moved file away from both source and destination names.
+        # This prevents a restored B from blocking restoration of A in A->B,B->C.
+        for rec in records:
+            current = rec['dst'] if rec['location'] == 'dst' else rec['tmp']
+            try:
+                if current.exists():
+                    rollback_tmp = current.with_name(
+                        f'.__anime_renamer_rollback_{uuid.uuid4().hex}{current.suffix}'
+                    )
+                    os.replace(current, rollback_tmp)
+                    staged.append((rec, rollback_tmp))
+            except Exception as rb_exc:
+                rollback_errors.append(f'{current}: {rb_exc}')
+
+        # Restore original source names.
+        for rec, rollback_tmp in staged:
+            try:
+                rec['src'].parent.mkdir(parents=True, exist_ok=True)
+                os.replace(rollback_tmp, rec['src'])
+            except Exception as rb_exc:
+                rollback_errors.append(f'{rollback_tmp} -> {rec["src"]}: {rb_exc}')
+
+        if rollback_errors:
+            return False, f'{exc}；回滚仍有异常：' + ' | '.join(rollback_errors)
+        return False, str(exc)
+
+
 def execute_plan(plan: list[RenameItem]) -> dict:
     actionable = [x for x in plan if x.status == '可重命名']
     if not actionable:
         return {'ok': False, 'message': '没有可执行的重命名项目。', 'count': 0}
 
     # Recheck conflicts immediately before modifying anything.
-    old_set = {os.path.normcase(os.path.abspath(x.old_path)) for x in actionable}
+    old_set = {_norm_path(x.old_path) for x in actionable}
     target_set: set[str] = set()
     for x in actionable:
-        t = os.path.normcase(os.path.abspath(x.new_path))
+        t = _norm_path(x.new_path)
         if t in target_set:
             return {'ok': False, 'message': f'目标文件名冲突：{x.new_path}', 'count': 0}
         target_set.add(t)
         if Path(x.new_path).exists() and t not in old_set:
             return {'ok': False, 'message': f'目标文件已存在：{x.new_path}', 'count': 0}
 
-    temp_records = []
-    completed = []
-    try:
-        # Phase 1: move all sources to temporary names to avoid A->B / B->C collisions.
-        for x in actionable:
-            src = Path(x.old_path)
-            tmp = src.with_name(f'.__anime_renamer_{uuid.uuid4().hex}{src.suffix}')
-            os.replace(src, tmp)
-            temp_records.append((x, tmp))
+    pairs = [(Path(x.old_path), Path(x.new_path)) for x in actionable]
+    ok, error = _transactional_rename(pairs, '.__anime_renamer_')
+    if not ok:
+        return {'ok': False, 'message': f'重命名失败，已回滚：{error}', 'count': 0}
 
-        # Phase 2: move temp files to final targets.
-        for x, tmp in temp_records:
-            dst = Path(x.new_path)
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(tmp, dst)
-            completed.append({'old_path': x.old_path, 'new_path': x.new_path})
-
-    except Exception as e:
-        # Best-effort rollback.
-        for x, tmp in reversed(temp_records):
-            try:
-                if tmp.exists() and not Path(x.old_path).exists():
-                    os.replace(tmp, x.old_path)
-            except Exception:
-                pass
-        for rec in reversed(completed):
-            try:
-                newp = Path(rec['new_path'])
-                oldp = Path(rec['old_path'])
-                if newp.exists() and not oldp.exists():
-                    os.replace(newp, oldp)
-            except Exception:
-                pass
-        return {'ok': False, 'message': f'重命名失败，已尝试回滚：{e}', 'count': len(completed)}
+    completed = [{'old_path': x.old_path, 'new_path': x.new_path} for x in actionable]
 
     history = {
         'version': 1,
@@ -356,28 +451,21 @@ def undo_last() -> dict:
     if not items:
         return {'ok': False, 'message': '历史记录为空。', 'count': 0}
 
-    # Validate first.
+    # Validate first. An old name occupied by another CURRENT file from this same
+    # batch is legal (e.g. original A->B, B->C leaves B and C before undo).
+    current_new_set = {_norm_path(rec['new_path']) for rec in items}
     for rec in items:
         oldp = Path(rec['old_path'])
         newp = Path(rec['new_path'])
         if not newp.exists():
             return {'ok': False, 'message': f'无法撤销：当前文件不存在：{newp}', 'count': 0}
-        if oldp.exists():
+        if oldp.exists() and _norm_path(oldp) not in current_new_set:
             return {'ok': False, 'message': f'无法撤销：原文件名已被占用：{oldp}', 'count': 0}
 
-    temp_records = []
-    try:
-        for rec in items:
-            newp = Path(rec['new_path'])
-            tmp = newp.with_name(f'.__anime_renamer_undo_{uuid.uuid4().hex}{newp.suffix}')
-            os.replace(newp, tmp)
-            temp_records.append((rec, tmp))
-        for rec, tmp in temp_records:
-            oldp = Path(rec['old_path'])
-            oldp.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(tmp, oldp)
-    except Exception as e:
-        return {'ok': False, 'message': f'撤销失败：{e}', 'count': 0}
+    pairs = [(Path(rec['new_path']), Path(rec['old_path'])) for rec in items]
+    ok, error = _transactional_rename(pairs, '.__anime_renamer_undo_')
+    if not ok:
+        return {'ok': False, 'message': f'撤销失败，已恢复到撤销前状态：{error}', 'count': 0}
 
     hp.unlink(missing_ok=True)
     return {'ok': True, 'message': f'已撤销上一次操作，共恢复 {len(items)} 个文件。', 'count': len(items)}

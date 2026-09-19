@@ -7,10 +7,11 @@ from tkinter import filedialog, messagebox, ttk
 
 from renamer_core import build_plan, execute_plan, undo_last
 
-APP_TITLE = '番剧批量重命名 AnimeRenamer v0.1.0'
+APP_TITLE = '番剧批量重命名 AnimeRenamer v0.2.1'
 
 TEMPLATES = {
     '番剧名 - 01': '{title} - {episode:02d}',
+    '番剧名 01': '{title} {episode:02d}',
     '番剧名 S01E01': '{title} S{season:02d}E{episode:02d}',
     '番剧名 - E01': '{title} - E{episode:02d}',
     '[01] 番剧名': '[{episode:02d}] {title}',
@@ -62,8 +63,10 @@ class App(tk.Tk):
         ttk.Entry(form, textvariable=self.folder_var).grid(row=0, column=1, columnspan=5, sticky='ew', pady=5)
         ttk.Button(form, text='选择…', command=self.choose_folder).grid(row=0, column=6, padx=(8, 0), pady=5)
 
-        ttk.Label(form, text='番剧名称').grid(row=1, column=0, sticky='w', padx=(0, 8), pady=5)
-        ttk.Entry(form, textvariable=self.title_var, width=28).grid(row=1, column=1, sticky='ew', pady=5)
+        ttk.Label(form, text='统一短名称').grid(row=1, column=0, sticky='w', padx=(0, 8), pady=5)
+        title_entry = ttk.Entry(form, textvariable=self.title_var, width=28)
+        title_entry.grid(row=1, column=1, sticky='ew', pady=5)
+        title_entry.bind('<Return>', lambda _e: self.scan())
         ttk.Label(form, text='季度').grid(row=1, column=2, sticky='e', padx=(12, 6))
         ttk.Spinbox(form, from_=1, to=99, textvariable=self.season_var, width=5).grid(row=1, column=3, sticky='w')
         ttk.Label(form, text='命名规则').grid(row=1, column=4, sticky='e', padx=(12, 6))
@@ -74,7 +77,7 @@ class App(tk.Tk):
         ttk.Label(form, text='模板').grid(row=2, column=0, sticky='w', padx=(0, 8), pady=5)
         self.template_entry = ttk.Entry(form, textvariable=self.template_var)
         self.template_entry.grid(row=2, column=1, columnspan=5, sticky='ew', pady=5)
-        ttk.Button(form, text='预览', command=self.scan).grid(row=2, column=6, padx=(8, 0), pady=5)
+        ttk.Button(form, text='识别 / 刷新预览', command=self.scan).grid(row=2, column=6, padx=(8, 0), pady=5)
 
         opts = ttk.Frame(form)
         opts.grid(row=3, column=0, columnspan=7, sticky='w', pady=(7, 2))
@@ -120,8 +123,8 @@ class App(tk.Tk):
         if not folder:
             return
         self.folder_var.set(folder)
-        if not self.title_var.get().strip():
-            self.title_var.set(Path(folder).name)
+        # Do not force the folder name to become the anime title.
+        # The user may first inspect episode detection, then enter one unified short name.
         self.scan()
 
     def on_template_change(self, _event=None):
@@ -133,19 +136,23 @@ class App(tk.Tk):
             self.template_entry.state(['!disabled'])
 
     def scan(self):
+        # A failed scan must never leave an executable stale plan behind.
+        self.plan = []
+        for iid in self.tree.get_children():
+            self.tree.delete(iid)
+
         folder = self.folder_var.get().strip()
         title = self.title_var.get().strip()
         if not folder or not Path(folder).is_dir():
+            self.status_var.set('扫描失败：请选择有效的番剧文件夹。')
             messagebox.showwarning('提示', '请先选择有效的番剧文件夹。')
-            return
-        if not title:
-            messagebox.showwarning('提示', '请输入番剧名称。')
-            return
+            return False
+        preview_title = title or '【待输入名称】'
 
         try:
             self.plan = build_plan(
                 folder=folder,
-                title=title,
+                title=preview_title,
                 season=max(1, int(self.season_var.get())),
                 template=self.template_var.get().strip() or '{title} - {episode:02d}',
                 recursive=self.recursive_var.get(),
@@ -155,11 +162,10 @@ class App(tk.Tk):
                 sequence_start=max(1, int(self.start_var.get())),
             )
         except Exception as e:
+            self.plan = []
+            self.status_var.set(f'扫描失败：{e}')
             messagebox.showerror('扫描失败', str(e))
-            return
-
-        for iid in self.tree.get_children():
-            self.tree.delete(iid)
+            return False
 
         counts = {'可重命名':0, '无需修改':0, '冲突':0, '未识别':0}
         for i, item in enumerate(self.plan):
@@ -172,16 +178,23 @@ class App(tk.Tk):
             elif item.status.startswith('冲突'): counts['冲突'] += 1
             else: counts['未识别'] += 1
 
+        title_hint = '' if title else ' 当前为识别预览；输入统一短名称后再刷新预览。'
         self.status_var.set(
             f"共 {len(self.plan)} 个文件：可重命名 {counts['可重命名']}，无需修改 {counts['无需修改']}，"
-            f"冲突 {counts['冲突']}，未识别 {counts['未识别']}。"
+            f"冲突 {counts['冲突']}，未识别 {counts['未识别']}。" + title_hint
         )
+        return True
 
     def execute(self):
+        if not self.title_var.get().strip():
+            messagebox.showwarning('提示', '请先输入统一短名称，再执行重命名。')
+            return
+        # Rebuild the plan with the current title/template so execution always matches the visible settings.
+        if not self.scan():
+            return
         if not self.plan:
-            self.scan()
-            if not self.plan:
-                return
+            messagebox.showinfo('提示', '当前文件夹没有可处理的媒体文件。')
+            return
         conflicts = [x for x in self.plan if x.status.startswith('冲突')]
         if conflicts:
             messagebox.showerror('存在冲突', '预览中存在目标文件名冲突。请先调整命名规则或文件内容。')
