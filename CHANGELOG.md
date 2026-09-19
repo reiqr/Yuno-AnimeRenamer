@@ -11,8 +11,21 @@
 - 扫描与执行改为后台线程，设置变化后要求重新预览。
 - 修正中文 BAT 文件名，提供使用 UTF-8 文件名标记的发布包生成脚本。
 - 增加文件操作故障注入、崩溃恢复、识别和 Tk 界面流程测试。
-- 界面更换为「未来日记」深色主题，统一配色、字体回退与图标素材。
 
 ## 0.2.1
 
 导入用户提供的版本，作为此次开发的 Git 基线。此前版本目录及压缩包保持原样。
+
+## Future Diary UI latest bundle (2026-09-19)
+- Includes Preview 16 UI, Preview 13 banner composition, Preview 15 Windows icon/build settings.
+- Includes all runtime theme assets required by AnimeRenamer.pyw.
+- Uses ASCII helper script names (`run_app.bat`, `build_exe.bat`) to reduce ZIP/Windows filename encoding issues.
+
+
+### Future Diary UI Preview 17
+- Enable Windows per-monitor DPI awareness before Tk initialization to prevent blurry bitmap-scaled UI.
+- Reduce the initial physical window size without reducing asset/UI rendering resolution.
+- Rebuild the sidebar portrait with a full-head safe crop and retain a 3x high-resolution derivative.
+- Distinguish Latin/Chinese/Japanese/terminal typography using installed Windows font families.
+- Clean EXE builds and output `AnimeRenamer_FutureDiary.exe` with the multi-size ICO embedded.
+- Add `refresh_icon_cache.bat` for stale Explorer icon caches.

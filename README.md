@@ -5,7 +5,7 @@ Windows 离线番剧与字幕整理工具。先识别并查看预览，再执行
 ## 启动
 
 - 已打包版本：双击 `AnimeRenamer.exe`，无需安装 Python。
-- 源码版本：安装 Python 3.10+，双击 `运行 AnimeRenamer.bat`，或运行 `python AnimeRenamer.pyw`。运行只使用标准库。
+- 源码版本：安装 Python 3.10+，双击 `run_app.bat`，或运行 `python AnimeRenamer.pyw`。运行只使用标准库。
 - 源码与后续 Git 历史固定保存在 `AnimeRenamer` 目录；旁边的旧版本目录和 ZIP 保留作为原始交付备份。
 
 ## 使用流程
@@ -70,7 +70,7 @@ Windows 离线番剧与字幕整理工具。先识别并查看预览，再执行
 python -m pip install pyinstaller
 ```
 
-双击 `生成EXE.bat`，输出 `dist\AnimeRenamer.exe`。构建脚本不会自动升级依赖。
+双击 `build_exe.bat`，输出 `dist\AnimeRenamer.exe`。脚本会把 `assets/` 和 `app_icon.ico` 一并嵌入/打包；构建脚本不会自动升级依赖。
 
 运行测试（包括真实 Tk 窗口控件的隐藏窗口测试）：
 
@@ -84,4 +84,28 @@ python -m unittest discover -s tests -v
 python package_release.py
 ```
 
-发布包输出到 `dist`，ZIP 仅包含源码、主题素材、测试、文档、启动/构建脚本和 EXE（已构建时），不包含 Git、缓存或真实媒体文件。`assets/` 为界面主题图，属程序资源，非用户媒体文件。
+发布包输出到 `dist`，ZIP 仅包含源码、测试、文档、启动/构建脚本和 EXE（已构建时），不包含 Git、缓存或真实媒体文件。
+
+
+## Future Diary UI latest bundle
+
+本目录已经包含当前主题运行和打包所需的完整资源：
+
+- `assets/yuno_sidebar.png`：左侧角色图
+- `assets/yuno_banner.png`：紧凑顶部横幅
+- `assets/yuno_banner_wide.png`：宽窗口顶部横幅
+- `assets/empty_phone.png`：空预览状态手机图
+- `assets/app_icon.png`：运行时窗口图标
+- `assets/app_icon.ico`：Windows EXE / 资源管理器图标
+
+当前 UI 代码为 Preview 16 状态，包含此前 Preview 14 的成品化布局、Preview 13 的横幅构图、Preview 15 的 EXE 图标/构建配置以及 Preview 16 的左侧视觉重心修正。
+
+
+## Future Diary UI - current full build notes
+
+- Windows DPI awareness is enabled before Tk creates the first window. This prevents Windows bitmap scaling from making the compact window blurry.
+- The sidebar portrait was rebuilt from the high-resolution source with a safe head/hair margin. `assets/yuno_sidebar_hd.png` is retained as the high-resolution source derivative.
+- The packaged EXE is built as `dist/AnimeRenamer_FutureDiary.exe` to avoid Windows Explorer reusing the icon cache of an older `AnimeRenamer.exe`.
+- `build_exe.bat` always removes old `build/`, `dist/`, and generated `.spec` files before building, and embeds both `assets/app_icon.ico` and the whole `assets/` directory.
+- If Explorer still shows a stale icon, run `refresh_icon_cache.bat` once and reopen the folder.
+- UI fonts use installed Windows fonts only: Microsoft YaHei UI for Chinese, Bahnschrift/Segoe UI for Latin headings, Yu Gothic UI for Japanese, and Cascadia Mono/Consolas for terminal-style labels. No font files are bundled.
