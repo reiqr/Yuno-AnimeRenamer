@@ -1,0 +1,131 @@
+--- a/AnimeRenamer.pyw	2026-09-19 09:18:05.233726613 +0000
++++ b/AnimeRenamer.pyw	2026-09-19 09:18:05.233051614 +0000
+@@ -39,6 +39,8 @@
+         variable.trace_add('write', self._sync_visual)
+         self.bind('<Enter>', self._enter, add='+')
+         self.bind('<Leave>', self._leave, add='+')
++        self.bind('<ButtonPress-1>', self._press, add='+')
++        self.bind('<ButtonRelease-1>', self._release, add='+')
+         self._sync_visual()
+@@ -64,6 +66,14 @@
+     def _leave(self, _event=None):
+         self._sync_visual()
++
++    def _press(self, _event=None):
++        if str(self.cget('state')) != 'disabled':
++            self.configure(bg=self._colors.get('press_bg', self._colors['hover_bg']))
++
++    def _release(self, _event=None):
++        if str(self.cget('state')) != 'disabled':
++            self._sync_visual()
+@@ -359,8 +369,11 @@
+                                activebackground=active, activeforeground='#FFFFFF',
+                                relief='flat', bd=0, padx=16, pady=8,
+                                cursor='hand2', font=(self.FONTS['body'], 9, 'bold'))
++            pressed = '#1E111A' if not primary and not danger else ('#981B4B' if primary else '#281018')
+             button.bind('<Enter>', lambda _e, b=button, col=active: b.configure(bg=col))
+             button.bind('<Leave>', lambda _e, b=button, col=bg: b.configure(bg=col))
++            button.bind('<ButtonPress-1>', lambda _e, b=button, col=pressed: b.configure(bg=col))
++            button.bind('<ButtonRelease-1>', lambda _e, b=button, col=active: b.configure(bg=col))
+             return button
+@@ -530,20 +543,23 @@
+-        style.map('Danger.TButton', background=[('active', '#52202B')])
++        style.map('Danger.TButton', background=[('pressed', '#2A1017'), ('active', '#52202B')], foreground=[('pressed', '#FFFFFF')])
+@@
+-        style.map('Ghost.TButton', background=[('active', c['panel3'])], foreground=[('active', c['text'])])
++        style.map('Ghost.TButton', background=[('pressed', '#171119'), ('active', c['panel3'])], foreground=[('pressed', '#FFFFFF'), ('active', c['text'])])
+@@
+-        style.map('Cyan.TButton', background=[('active', '#1B4A4A')])
++        style.map('Cyan.TButton', background=[('pressed', '#0D292B'), ('active', '#1B4A4A')], foreground=[('pressed', '#FFFFFF')])
+@@
+-        style.map('Treeview', background=[('selected', '#4A1F39')], foreground=[('selected', '#FFFFFF')])
++        style.map('Treeview', background=[('selected', '#6A2850')], foreground=[('selected', '#FFFFFF')])
+@@ -598,10 +614,11 @@
+-        self.chrome_state_var = tk.StringVar(value='PREVIEW SAFE')
+-        tk.Label(chrome, textvariable=self.chrome_state_var, bg='#17121B', fg='#74FFF3', bd=1,
++        self.chrome_state_var = tk.StringVar(value='WAITING')
++        self.chrome_state_label = tk.Label(chrome, textvariable=self.chrome_state_var, bg='#132223', fg='#74FFF3', bd=1,
+                  relief='solid', padx=10, pady=4, highlightthickness=1, highlightbackground='#275A60',
+-                 font=(self.FONTS['mono'], 8, 'bold')).grid(row=0, column=2, sticky='e')
++                 font=(self.FONTS['mono'], 8, 'bold'))
++        self.chrome_state_label.grid(row=0, column=2, sticky='e')
+@@ -663,7 +680,7 @@
+-            'hover_bg': '#352031', 'border': '#493544', 'accent': c['pink'],
++            'hover_bg': '#352031', 'press_bg': '#241522', 'border': '#493544', 'accent': c['pink'],
+@@ -727,6 +744,9 @@
+         self.tree.bind('<Motion>', self._on_tree_motion, add='+')
+         self.tree.bind('<Leave>', self._on_tree_leave, add='+')
+         self.tree.bind('<Configure>', self._resize_tree_columns, add='+')
++        self.tree.bind('<<TreeviewOpen>>', lambda _e: self.after_idle(self._sync_group_markers), add='+')
++        self.tree.bind('<<TreeviewClose>>', lambda _e: self.after_idle(self._sync_group_markers), add='+')
++        self.tree.bind('<ButtonRelease-1>', lambda _e: self.after_idle(self._sync_group_markers), add='+')
+         self._hover_iid = None
+@@ -768,13 +788,29 @@
+-        ttk.Label(footer, text='PREVIEW SAFE', foreground=c['cyan'], background=c['bg'], font=(self.FONTS['mono'], 8, 'bold')).pack(side='right', padx=(0, 10))
++        self.footer_state_label = tk.Label(footer, textvariable=self.chrome_state_var, bg=c['bg'], fg=c['cyan'], font=(self.FONTS['mono'], 8, 'bold'), bd=0)
++        self.footer_state_label.pack(side='right', padx=(0, 10))
+@@
++        self._set_chrome_state('WAITING', 'neutral')
++
++    def _sync_group_markers(self):
++        if not hasattr(self, 'tree'):
++            return
++        for iid in self.tree.get_children(''):
++            if iid not in self.group_nodes or not self.tree.exists(iid):
++                continue
++            text = str(self.tree.item(iid, 'text'))
++            label = text[1:].lstrip() if text.startswith(('▾', '▸')) else text.lstrip()
++            marker = '▾' if bool(self.tree.item(iid, 'open')) else '▸'
++            self.tree.item(iid, text=f'{marker}  {label}')
+@@ -840,8 +876,22 @@
+     def _set_chrome_state(self, text, mode='info'):
++        palette = {
++            'info': ('#132223', '#74FFF3', '#275A60'), 'success': ('#11241E', '#7CF6D9', '#2E6F61'),
++            'warning': ('#2A2013', '#FFD194', '#765527'), 'error': ('#2A1419', '#FF929E', '#7A3040'),
++            'dirty': ('#281521', '#FF91BA', '#7A3655'), 'busy': ('#211A32', '#C2AEFF', '#5A4B83'),
++            'neutral': ('#19161C', '#A89BA6', '#3A3239'),
++        }
++        bg, fg, border = palette.get(mode, palette['info'])
+         if hasattr(self, 'chrome_state_var'):
+             self.chrome_state_var.set(text)
++        if hasattr(self, 'chrome_state_label'):
++            self.chrome_state_label.configure(bg=bg, fg=fg, highlightbackground=border)
++        if hasattr(self, 'footer_state_label'):
++            self.footer_state_label.configure(fg=fg)
+@@ -852,7 +902,7 @@
+-        self._set_chrome_state('NEEDS REFRESH')
++        self._set_chrome_state('NEEDS REFRESH', 'dirty')
+@@ -950,7 +1000,7 @@
+-                self.tree.insert('', 'end', iid=node, text='  ' + label, open=True, tags=('group',))
++                self.tree.insert('', 'end', iid=node, text='▾  ' + label, open=True, tags=('group',))
+@@ -969,27 +1019,28 @@
+         self.status_var.set(f'{len(nodes)} 组 · {len(plan)} 个文件 · 可执行 {ready} · 待确认/填写 {review} · 已跳过 {sum(x.status == "已跳过" for x in plan)}')
++        self._sync_group_markers()
+@@
+-            self._set_chrome_state('CONFLICT DETECTED')
++            self._set_chrome_state('CONFLICT DETECTED', 'error')
+@@
+-            self._set_chrome_state('CHECK BEFORE RUN')
++            self._set_chrome_state('CHECK BEFORE RUN', 'warning')
+@@
+-            self._set_chrome_state('PREVIEW SAFE')
++            self._set_chrome_state('PREVIEW SAFE', 'success')
+@@
+-            self._set_chrome_state('NO READY ITEMS')
++            self._set_chrome_state('NO READY ITEMS', 'neutral')
+@@
+-            self._set_chrome_state('PROCESSING...')
++            self._set_chrome_state('PROCESSING...', 'busy')
+         elif allowed:
+-            self._set_chrome_state('PREVIEW SAFE')
++            self._set_chrome_state('PREVIEW SAFE', 'success')
+@@ -1012,7 +1063,8 @@
+-            self.detail_var.set(f'{item.reason}（规则评分 {item.confidence}/100）\n{item.old_path}\n→ {item.new_path}')
++            status = item.status if item.status else '未分类'
++            self.detail_var.set(f'SELECTED · {status} · {item.reason}（规则评分 {item.confidence}/100）\n{item.old_path}\n→ {item.new_path}')
+@@ -1080,7 +1132,7 @@
+-        self._set_chrome_state('DONE' if result['ok'] else 'FAILED')
++        self._set_chrome_state('DONE' if result['ok'] else 'FAILED', 'success' if result['ok'] else 'error')
+@@ -1100,7 +1152,7 @@
+-                self._set_chrome_state('RECOVERY REQUIRED')
++                self._set_chrome_state('RECOVERY REQUIRED', 'warning')
