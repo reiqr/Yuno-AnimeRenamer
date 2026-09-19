@@ -8,10 +8,15 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import time
 import uuid
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
+
+
+class OperationCancelled(Exception):
+    """Raised when the user requests a safe copy cancellation."""
 
 
 def _storage():
@@ -195,44 +200,119 @@ def _make_journal(pairs, mode, action='execute'):
             'action': action, 'items': records}
 
 
-def _copy_record(rec, pending, journal):
+def _copy_record(rec, pending, journal, *, progress=None, cancel_event=None,
+                 item_index=0, item_count=1, completed_bytes=0, total_bytes=0, started_at=None):
     src, temp = Path(rec['src']), Path(rec['tmp'])
     temp.parent.mkdir(parents=True, exist_ok=True)
+    file_size = int(rec['signature'][2])
+    copied_file = 0
+    last_report = 0.0
+    started_at = started_at or time.monotonic()
+
+    def cancelled():
+        return bool(cancel_event is not None and cancel_event.is_set())
+
+    def report(force=False):
+        nonlocal last_report
+        if not progress:
+            return
+        now = time.monotonic()
+        if not force and now - last_report < 0.10:
+            return
+        total_copied = completed_bytes + copied_file
+        elapsed = max(now - started_at, 0.001)
+        speed = total_copied / elapsed
+        progress(item_index + 1, item_count, src.name, total_copied, total_bytes,
+                 copied_file, file_size, speed)
+        last_report = now
+
+    class CopyReader:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def read(self, length=-1):
+            if cancelled():
+                raise OperationCancelled('用户取消复制')
+            return self.stream.read(length)
+
+    class CopyWriter:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def write(self, data):
+            nonlocal copied_file
+            if cancelled():
+                raise OperationCancelled('用户取消复制')
+            written = self.stream.write(data)
+            copied_file += written
+            report(force=copied_file >= file_size)
+            return written
+
+    if cancelled():
+        raise OperationCancelled('用户取消复制')
     with temp.open('xb') as output:
         rec['copy_identity'] = fingerprint(temp)
         _write_json(pending, journal)
         with src.open('rb') as source:
-            shutil.copyfileobj(source, output, length=1024 * 1024)
+            shutil.copyfileobj(CopyReader(source), CopyWriter(output), length=1024 * 1024)
+        if file_size == 0:
+            report(force=True)
         output.flush()
         os.fsync(output.fileno())
+    if cancelled():
+        raise OperationCancelled('用户取消复制')
     if not _matches(src, rec['signature']):
         raise RuntimeError(f'复制期间原文件改变：{src}')
     shutil.copystat(src, temp)
     rec['copy_signature'] = fingerprint(temp)
     _write_json(pending, journal)
+    return copied_file
 
 
-def _run(journal, progress=None):
+def _run(journal, progress=None, cancel_event=None):
     pending, history = _paths()
     # Nothing may touch media if journal creation or flushing fails.
     _reserve_journal(pending, journal)
     try:
         items = journal['items']
+        total_bytes = sum(int(rec['signature'][2]) for rec in items) if journal['mode'] == 'copy' else 0
+        completed_bytes = 0
+        started_at = time.monotonic()
         for index, rec in enumerate(items):
             if not _matches(rec['src'], rec['signature']):
                 raise RuntimeError(f'文件已改变，请重新预览：{rec["src"]}')
             if journal['mode'] == 'rename':
                 _move(rec['src'], rec['tmp'])
+                if progress:
+                    progress(index + 1, len(items), Path(rec['src']).name)
             else:
-                _copy_record(rec, pending, journal)
-            if progress:
-                progress(index + 1, len(items), Path(rec['src']).name)
+                copied = _copy_record(
+                    rec, pending, journal, progress=progress, cancel_event=cancel_event,
+                    item_index=index, item_count=len(items), completed_bytes=completed_bytes,
+                    total_bytes=total_bytes, started_at=started_at)
+                completed_bytes += copied
         for rec in items:
+            if journal['mode'] == 'copy' and cancel_event is not None and cancel_event.is_set():
+                raise OperationCancelled('用户取消复制')
             _move(rec['tmp'], rec['dst'])
+        if journal['mode'] == 'copy' and cancel_event is not None and cancel_event.is_set():
+            raise OperationCancelled('用户取消复制')
         if journal['action'] == 'undo':
             _write_json(history, {'undo_id': journal['operation_id'], 'items': []})
         else:
             _write_json(history, journal)
+    except OperationCancelled:
+        try:
+            _remove_copies(journal)
+            pending.unlink()
+            return {
+                'ok': False, 'cancelled': True, 'recovery_required': False,
+                'message': '已取消复制，本次生成的临时文件和副本已清理，原文件未改变。', 'count': 0}
+        except Exception as rollback_error:
+            return {
+                'ok': False, 'cancelled': True, 'recovery_required': True,
+                'message': f'复制已停止，但清理尚未完成。恢复记录已保留；请点击“恢复中断操作”：{rollback_error}',
+                'count': 0}
     except Exception as exc:
         try:
             if journal['mode'] == 'rename':
@@ -251,7 +331,7 @@ def _run(journal, progress=None):
 
 
 @_exclusive
-def execute_plan(plan, progress=None):
+def execute_plan(plan, progress=None, cancel_event=None):
     try:
         if any(x.status.startswith(('冲突', '错误')) for x in plan):
             raise ValueError('请先解决或跳过预览中的冲突和错误')
@@ -282,7 +362,7 @@ def execute_plan(plan, progress=None):
         if len(identities) != len(items):
             raise ValueError('同一批次包含指向相同内容的硬链接，请分批处理')
         journal = _make_journal([(x.old_path, x.new_path) for x in items], mode)
-        return _run(journal, progress)
+        return _run(journal, progress, cancel_event)
     except Exception as exc:
         return {'ok': False, 'message': f'未执行操作：{exc}', 'count': 0}
 

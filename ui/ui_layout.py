@@ -194,6 +194,7 @@ class LayoutMixin:
 
         # Action strip: edit tools stay secondary; execute is the single dominant action.
         toolbar = ttk.Frame(main, style='Toolbar.TFrame', padding=(8, 4))
+        self.toolbar = toolbar
         toolbar.pack(fill='x', pady=(6, 5))
         ttk.Button(toolbar, text='分组', image=self.UI_ICONS['group'], compound='left', command=self.edit_group, style='Secondary.TButton').pack(side='left', padx=(0, 6))
         ttk.Button(toolbar, text='纠正', image=self.UI_ICONS['edit'], compound='left', command=self.edit_item, style='Secondary.TButton').pack(side='left', padx=(0, 6))
@@ -213,10 +214,29 @@ class LayoutMixin:
         self.undo_btn.bind('<Leave>', self._on_tree_leave)
         self.recover_btn.bind('<Leave>', self._on_tree_leave)
 
+        # Copy progress stays hidden until a copy operation actually starts.
+        self.transfer_progress_var = tk.DoubleVar(value=0.0)
+        self.transfer_title_var = tk.StringVar(value='COPY  0.0%')
+        self.transfer_detail_var = tk.StringVar(value='')
+        self.transfer_frame = tk.Frame(main, bg='#121017', bd=0, highlightthickness=1,
+                                       highlightbackground='#2B4850')
+        tk.Label(self.transfer_frame, textvariable=self.transfer_title_var, bg='#121017', fg='#7CF6D9',
+                 padx=8, pady=4, font=(self.FONTS['mono'], 8, 'bold')).pack(side='left')
+        self.transfer_bar = ttk.Progressbar(
+            self.transfer_frame, orient='horizontal', mode='determinate', maximum=100.0,
+            variable=self.transfer_progress_var, length=220)
+        self.transfer_bar.pack(side='left', fill='x', expand=True, padx=(2, 8), pady=5)
+        tk.Label(self.transfer_frame, textvariable=self.transfer_detail_var, bg='#121017', fg='#AFA2AB',
+                 anchor='e', font=(self.FONTS['mono'], 7)).pack(side='left', padx=(0, 8))
+        self.cancel_copy_btn = ttk.Button(
+            self.transfer_frame, text='取消复制', command=self.cancel_current_copy, style='Danger.TButton')
+        self.cancel_copy_btn.pack(side='right', padx=(0, 6), pady=2)
+
         # One compact information rail replaces the old two-row log/footer stack.
         self.detail_var = tk.StringVar(value='待确认的文件不会执行；悬停查看识别依据，双击可纠正集数。')
         self.status_var = tk.StringVar(value='选择文件夹，填写作品名，然后扫描未来记录。')
         info_rail = tk.Frame(main, bg='#121017', bd=0, highlightthickness=1, highlightbackground='#2A222B')
+        self.info_rail = info_rail
         info_rail.pack(fill='x', pady=(0, 5))
         tk.Label(info_rail, text='DIARY LOG', bg='#121017', fg=c['cyan'], padx=8, pady=4,
                  font=(self.FONTS['mono'], 7, 'bold')).pack(side='left')

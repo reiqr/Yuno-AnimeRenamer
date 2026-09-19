@@ -10,6 +10,18 @@ from ui_constants import TEMPLATES
 from ui_dialogs import GroupDialog
 from ui_theme import ThemeToggle
 
+def _format_bytes(value):
+    value = float(max(0, value or 0))
+    units = ('B', 'KB', 'MB', 'GB', 'TB')
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            return f'{value:.0f} {unit}' if unit == 'B' else f'{value:.1f} {unit}'
+        value /= 1024
+
+
+def _format_speed(value):
+    return f'{_format_bytes(value)}/s'
+
 
 class ActionMixin:
     def settings_changed(self, *_):
@@ -47,14 +59,21 @@ class ActionMixin:
                 yield child
             yield from self._controls(child)
 
-    def _start_task(self, function, completed):
+    def _start_task(self, function, completed, cancellable=False):
         if self.busy:
             return
         self.busy = True
+        self._cancel_event = threading.Event() if cancellable else None
         self._start_busy_animation()
         states = [(w, w.state()) for w in self._controls(self)]
         for widget, _ in states:
             widget.state(['disabled'])
+        if cancellable and hasattr(self, 'transfer_frame'):
+            self.transfer_progress_var.set(0.0)
+            self.transfer_title_var.set('COPY  0.0%')
+            self.transfer_detail_var.set('准备复制…')
+            self.transfer_frame.pack(fill='x', pady=(0, 5), after=self.toolbar)
+            self.cancel_copy_btn.state(['!disabled'])
         events = queue.Queue()
 
         def worker():
@@ -63,18 +82,34 @@ class ActionMixin:
             except Exception as exc:
                 events.put(('error', str(exc)))
 
+        def handle_progress(result):
+            if len(result) >= 8:
+                current, total, name, copied, total_bytes, file_copied, file_size, speed = result[:8]
+                percent = 100.0 if total_bytes <= 0 else min(100.0, copied * 100.0 / total_bytes)
+                self.transfer_progress_var.set(percent)
+                self.transfer_title_var.set(
+                    f'COPY  {percent:5.1f}%  ·  {_format_bytes(copied)} / {_format_bytes(total_bytes)}')
+                self.transfer_detail_var.set(
+                    f'{current}/{total} · {name} · {_format_bytes(file_copied)} / {_format_bytes(file_size)} · {_format_speed(speed)}')
+                self.status_var.set(f'复制中 {percent:.1f}%：{name} · {_format_speed(speed)}')
+            else:
+                self.status_var.set(f'处理中 {result[0]}/{result[1]}：{result[2]}')
+
         def poll():
             try:
                 while True:
                     kind, result = events.get_nowait()
                     if kind == 'progress':
-                        self.status_var.set(f'处理中 {result[0]}/{result[1]}：{result[2]}')
+                        handle_progress(result)
                         continue
                     self.busy = False
                     self._stop_busy_animation()
                     for widget, state in states:
                         widget.state(['!disabled'])
                         widget.state(state)
+                    if hasattr(self, 'transfer_frame') and self.transfer_frame.winfo_manager():
+                        self.transfer_frame.pack_forget()
+                    self._cancel_event = None
                     if kind == 'error':
                         self.dirty = True
                         self._alert('操作失败', result, kind='error')
@@ -86,6 +121,19 @@ class ActionMixin:
                 self.after(60, poll)
         threading.Thread(target=worker, daemon=False).start()
         self.after(60, poll)
+
+    def cancel_current_copy(self):
+        event = getattr(self, '_cancel_event', None)
+        if not self.busy or event is None or event.is_set():
+            return
+        event.set()
+        if hasattr(self, 'cancel_copy_btn'):
+            self.cancel_copy_btn.state(['disabled'])
+        if hasattr(self, 'transfer_title_var'):
+            self.transfer_title_var.set('CANCELLING · 正在安全停止')
+            self.transfer_detail_var.set('正在清理本次临时文件和已生成副本，请稍候…')
+        self._stop_busy_animation()
+        self._set_chrome_state('CANCELLING...', 'warning')
 
     def scan(self):
         if self.busy:
@@ -300,9 +348,22 @@ class ActionMixin:
             + '。\n待确认项目不会执行，按当前预览继续？')
         if self._confirm('确认执行', summary):
             plan = list(self.plan)
-            self._start_task(lambda progress: execute_plan(plan, progress), self.operation_done)
+            copy_mode = self.mode_var.get() != '原地重命名'
+            self._start_task(
+                lambda progress: execute_plan(plan, progress, self._cancel_event),
+                self.operation_done, cancellable=copy_mode)
 
     def operation_done(self, result):
+        cancelled = bool(result.get('cancelled'))
+        recovery_required = bool(result.get('recovery_required'))
+        if cancelled and not recovery_required:
+            self.dirty = False
+            self.status_var.set(result['message'])
+            self._set_chrome_state('CANCELLED', 'warning')
+            self._alert('已取消', result['message'], kind='warning')
+            self.detail_var.set('复制已安全取消；当前预览仍可继续使用。')
+            self.after(50, self.check_recovery)
+            return
         self.dirty = True
         self.status_var.set(result['message'])
         self._set_chrome_state('DONE' if result['ok'] else 'FAILED', 'success' if result['ok'] else 'error')
