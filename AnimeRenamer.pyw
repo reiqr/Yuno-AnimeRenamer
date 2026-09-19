@@ -1,8 +1,11 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 import tkinter as tk
+import tkinter.font as tkfont
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
@@ -56,29 +59,241 @@ class GroupDialog(simpledialog.Dialog):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title(f'番剧批量重命名 · AnimeRenamer {VERSION}')
-        self.geometry('1260x820')
-        self.minsize(1050, 720)
+        self.title(f'AnimeRenamer {VERSION} · 未来日记主题')
+        self.geometry('1380x860')
+        self.minsize(1120, 720)
         self.plan = []
         self.overrides, self.groups, self.skipped = {}, {}, set()
         self.busy, self.dirty = False, True
         self.source_context = ''
         self.group_nodes = {}
         self._build_ui()
+        try:
+            icon = self._load_photo('app_icon.png')
+            if icon:
+                self.iconphoto(True, icon)
+        except tk.TclError:
+            pass
         self.protocol('WM_DELETE_WINDOW', self.close)
         self.after(150, self.check_recovery)
 
+    def _pick_font(self, *preferred):
+        """Return the first installed font family, with a safe Tk fallback."""
+        try:
+            installed = {name.casefold(): name for name in tkfont.families(self)}
+        except tk.TclError:
+            installed = {}
+        for name in preferred:
+            hit = installed.get(name.casefold())
+            if hit:
+                return hit
+        return 'TkDefaultFont'
+
+    def _asset_path(self, name):
+        """Find ASCII-named theme assets next to source/EXE or in PyInstaller temp data."""
+        roots = []
+        meipass = getattr(sys, '_MEIPASS', None)
+        if meipass:
+            roots.append(Path(meipass))
+        try:
+            roots.append(Path(__file__).resolve().parent)
+        except NameError:
+            pass
+        if getattr(sys, 'frozen', False):
+            roots.append(Path(sys.executable).resolve().parent)
+        for root in roots:
+            path = root / 'assets' / name
+            if path.is_file():
+                return path
+        return None
+
+    def _load_photo(self, name):
+        path = self._asset_path(name)
+        if not path:
+            return None
+        try:
+            photo = tk.PhotoImage(file=str(path))
+            self._theme_images.append(photo)
+            return photo
+        except tk.TclError:
+            return None
+
+    def _draw_banner(self, _event=None):
+        canvas = getattr(self, 'banner_canvas', None)
+        if not canvas:
+            return
+        canvas.delete('overlay')
+        width = max(canvas.winfo_width(), 720)
+        if getattr(self, 'banner_photo', None):
+            canvas.create_image(0, 0, image=self.banner_photo, anchor='nw', tags='overlay')
+        # Dark veil on the right keeps text readable without altering the asset.
+        canvas.create_rectangle(max(420, int(width * 0.48)), 0, width, 132,
+                                fill='#0D0910', stipple='gray50', outline='', tags='overlay')
+        tx = max(535, int(width * 0.61))
+        canvas.create_text(tx, 32, text='ANIME RENAMER', anchor='w', fill='#FFF2F7',
+                           font=(self.FONTS['display'], 21, 'bold'), tags='overlay')
+        canvas.create_text(tx, 65, text='未来日记 · RENAME TERMINAL', anchor='w', fill='#FF6EA3',
+                           font=(self.FONTS['body'], 10, 'bold'), tags='overlay')
+        canvas.create_text(tx, 93, text='扫描  /  校对  /  预览  /  改写未来', anchor='w', fill='#C9BCC5',
+                           font=(self.FONTS['body'], 9), tags='overlay')
+        canvas.create_line(tx, 111, min(width - 28, tx + 330), 111,
+                           fill='#6E294A', width=1, tags='overlay')
+
     def _build_ui(self):
+        # Future Diary inspired theme: dark diary surface + pink danger accent + cyan status accent.
+        # UI-only layer; rename/copy/undo logic remains unchanged.
+        self.COLORS = {
+            'bg': '#0D0B11',
+            'panel': '#141119',
+            'panel2': '#1B1620',
+            'panel3': '#231A25',
+            'border': '#3A2835',
+            'text': '#F6EEF4',
+            'muted': '#A89BA6',
+            'pink': '#FF4F91',
+            'pink2': '#D82D72',
+            'red': '#C62E45',
+            'cyan': '#38D6D0',
+            'violet': '#8C79D8',
+            'warning': '#F0A14A',
+            'error': '#FF5F6D',
+            'success': '#42E3C4',
+        }
+        c = self.COLORS
+        self.configure(bg=c['bg'])
+        self._theme_images = []
+        self.FONTS = {
+            'body': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'PingFang SC', 'Segoe UI'),
+            'display': self._pick_font('Segoe UI Variable Display', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Segoe UI'),
+            'jp': self._pick_font('Yu Gothic UI', 'Yu Gothic', 'Meiryo UI', 'Noto Sans CJK JP', 'Noto Sans JP', 'Microsoft YaHei UI'),
+            'mono': self._pick_font('Cascadia Mono', 'JetBrains Mono', 'Consolas', 'DejaVu Sans Mono'),
+        }
+        self.option_add('*Font', (self.FONTS['body'], 10))
+
         style = ttk.Style(self)
-        if 'vista' in style.theme_names():
-            style.theme_use('vista')
-        style.configure('Treeview', rowheight=29)
-        outer = ttk.Frame(self, padding=16)
-        outer.pack(fill='both', expand=True)
-        ttk.Label(outer, text='番剧批量重命名', font=('Microsoft YaHei UI', 18, 'bold')).pack(anchor='w')
-        ttk.Label(outer, text='离线识别 · 按目录和季号分组 · 确认预览后执行').pack(anchor='w', pady=(4, 12))
-        form = ttk.LabelFrame(outer, text='文件与命名', padding=10)
-        form.pack(fill='x')
+        if 'clam' in style.theme_names():
+            style.theme_use('clam')
+
+        # Base controls
+        style.configure('.',
+                        background=c['bg'], foreground=c['text'],
+                        fieldbackground=c['panel2'], bordercolor=c['border'],
+                        lightcolor=c['border'], darkcolor=c['border'],
+                        font=(self.FONTS['body'], 10))
+        style.configure('App.TFrame', background=c['bg'])
+        style.configure('Panel.TFrame', background=c['panel'])
+        style.configure('Card.TFrame', background=c['panel2'])
+        style.configure('Sidebar.TFrame', background='#110C14')
+        style.configure('TLabel', background=c['bg'], foreground=c['text'])
+        style.configure('Panel.TLabel', background=c['panel'], foreground=c['text'])
+        style.configure('Card.TLabel', background=c['panel2'], foreground=c['text'])
+        style.configure('Muted.TLabel', background=c['bg'], foreground=c['muted'])
+        style.configure('MutedPanel.TLabel', background=c['panel'], foreground=c['muted'])
+        style.configure('Sidebar.TLabel', background='#110C14', foreground=c['text'])
+        style.configure('SidebarMuted.TLabel', background='#110C14', foreground='#A98E9E')
+        style.configure('Hero.TLabel', background='#110C14', foreground='#FFF1F7',
+                        font=(self.FONTS['display'], 20, 'bold'))
+        style.configure('HeroSub.TLabel', background='#110C14', foreground=c['pink'],
+                        font=(self.FONTS['mono'], 8, 'bold'))
+        style.configure('Title.TLabel', background=c['bg'], foreground=c['text'],
+                        font=(self.FONTS['display'], 18, 'bold'))
+        style.configure('Section.TLabel', background=c['panel'], foreground=c['text'],
+                        font=(self.FONTS['body'], 11, 'bold'))
+        style.configure('Accent.TLabel', background=c['panel'], foreground=c['pink'])
+        style.configure('Cyan.TLabel', background=c['panel2'], foreground=c['cyan'],
+                        font=(self.FONTS['mono'], 8, 'bold'))
+
+        style.configure('TEntry', padding=7, relief='flat', borderwidth=1,
+                        foreground=c['text'], fieldbackground=c['panel3'])
+        style.map('TEntry', fieldbackground=[('disabled', '#17131A')],
+                  foreground=[('disabled', '#706670')])
+        style.configure('TCombobox', padding=6, arrowsize=14,
+                        foreground=c['text'], fieldbackground=c['panel3'])
+        style.map('TCombobox', fieldbackground=[('readonly', c['panel3'])],
+                  selectbackground=[('readonly', c['panel3'])],
+                  selectforeground=[('readonly', c['text'])])
+        style.configure('TSpinbox', padding=6, arrowsize=12,
+                        foreground=c['text'], fieldbackground=c['panel3'])
+        style.configure('TCheckbutton', background=c['panel'], foreground=c['text'], padding=2)
+        style.map('TCheckbutton', background=[('active', c['panel'])],
+                  foreground=[('active', c['text'])],
+                  indicatorcolor=[('selected', c['pink']), ('!selected', '#5D505A')])
+
+        style.configure('TButton', padding=(12, 8), relief='flat', borderwidth=1,
+                        background=c['panel3'], foreground=c['text'])
+        style.map('TButton', background=[('active', '#332536'), ('pressed', '#241A28'), ('disabled', '#17141A')],
+                  foreground=[('disabled', '#655C65')])
+        style.configure('Primary.TButton', padding=(16, 9), background=c['pink2'],
+                        foreground='#FFFFFF', bordercolor=c['pink'])
+        style.map('Primary.TButton', background=[('active', c['pink']), ('pressed', '#B61F5C'), ('disabled', '#442537')],
+                  foreground=[('disabled', '#957A88')])
+        style.configure('Danger.TButton', background='#3A1820', foreground='#FF8B99', bordercolor='#702535')
+        style.map('Danger.TButton', background=[('active', '#52202B')])
+        style.configure('Ghost.TButton', background=c['panel2'], foreground=c['muted'], bordercolor=c['border'])
+        style.map('Ghost.TButton', background=[('active', c['panel3'])], foreground=[('active', c['text'])])
+        style.configure('Cyan.TButton', background='#143638', foreground='#74FFF3', bordercolor='#246B6A')
+        style.map('Cyan.TButton', background=[('active', '#1B4A4A')])
+
+        style.configure('Treeview', rowheight=32, relief='flat', borderwidth=0,
+                        background='#121017', fieldbackground='#121017', foreground='#EDE5EC',
+                        font=(self.FONTS['body'], 9))
+        style.configure('Treeview.Heading', background='#211923', foreground='#EADCE7',
+                        relief='flat', borderwidth=0, padding=(8, 8), font=(self.FONTS['body'], 9, 'bold'))
+        style.map('Treeview', background=[('selected', '#4A1F39')], foreground=[('selected', '#FFFFFF')])
+        style.map('Treeview.Heading', background=[('active', '#312336')])
+        style.configure('Vertical.TScrollbar', background='#251B28', troughcolor='#121017', arrowcolor='#998793')
+        style.configure('Horizontal.TScrollbar', background='#251B28', troughcolor='#121017', arrowcolor='#998793')
+
+        # Main composition: image-backed themed sidebar + working area.
+        shell = ttk.Frame(self, style='App.TFrame')
+        shell.pack(fill='both', expand=True)
+        sidebar = ttk.Frame(shell, style='Sidebar.TFrame', width=280)
+        sidebar.pack(side='left', fill='y')
+        sidebar.pack_propagate(False)
+        main = ttk.Frame(shell, style='App.TFrame', padding=(18, 14, 18, 14))
+        main.pack(side='left', fill='both', expand=True)
+
+        # Sidebar uses an optimized local PNG generated for this theme.
+        self.sidebar_photo = self._load_photo('yuno_sidebar.png')
+        if self.sidebar_photo:
+            tk.Label(sidebar, image=self.sidebar_photo, bg='#110C14', bd=0,
+                     highlightthickness=0).pack(fill='x')
+        else:
+            fallback = tk.Canvas(sidebar, width=280, height=390, bg='#110C14', highlightthickness=0)
+            fallback.pack(fill='x')
+            fallback.create_oval(45, 42, 235, 230, fill='#321326', outline='#74244D', width=2)
+            fallback.create_text(140, 182, text='MIRAI NIKKI', fill='#FF6EA3',
+                                 font=(self.FONTS['display'], 16, 'bold'))
+            fallback.create_text(140, 214, text='theme asset missing', fill='#927B8A',
+                                 font=(self.FONTS['mono'], 8))
+
+        side_text = ttk.Frame(sidebar, style='Sidebar.TFrame', padding=(20, 9, 18, 16))
+        side_text.pack(fill='both', expand=True)
+        ttk.Label(side_text, text='未来日记', style='Hero.TLabel').pack(anchor='w')
+        ttk.Label(side_text, text='MIRAI NIKKI  /  RENAME TERMINAL', style='HeroSub.TLabel').pack(anchor='w', pady=(2, 12))
+        ttk.Label(side_text, text='未来は、まだ書き換えられる。', style='Sidebar.TLabel',
+                  font=(self.FONTS['jp'], 10, 'bold')).pack(anchor='w')
+        ttk.Label(side_text, text='文件名的未来，由你确认后再改写。', style='SidebarMuted.TLabel',
+                  font=(self.FONTS['body'], 9), justify='left').pack(anchor='w', pady=(5, 13))
+        ttk.Separator(side_text, orient='horizontal').pack(fill='x', pady=(2, 10))
+        ttk.Label(side_text, text='●  PINK   改写 / 主操作', style='SidebarMuted.TLabel').pack(anchor='w', pady=2)
+        ttk.Label(side_text, text='●  CYAN   安全 / 可执行', style='SidebarMuted.TLabel').pack(anchor='w', pady=2)
+        ttk.Label(side_text, text='●  RED    冲突 / 风险', style='SidebarMuted.TLabel').pack(anchor='w', pady=2)
+        ttk.Label(side_text, text=f'AnimeRenamer {VERSION}', style='SidebarMuted.TLabel',
+                  font=(self.FONTS['mono'], 8)).pack(side='bottom', anchor='w')
+
+        # Image-backed top banner. Text is rendered by Tk to keep Chinese/Japanese crisp.
+        self.banner_photo = self._load_photo('yuno_banner.png')
+        self.banner_canvas = tk.Canvas(main, height=132, bg='#140C13', bd=0,
+                                       highlightthickness=0, relief='flat')
+        self.banner_canvas.pack(fill='x', pady=(0, 11))
+        self.banner_canvas.bind('<Configure>', self._draw_banner)
+        self.after_idle(self._draw_banner)
+
+        # Form card
+        form_card = ttk.Frame(main, style='Panel.TFrame', padding=(14, 12))
+        form_card.pack(fill='x')
+        ttk.Label(form_card, text='01  日记源 / FILE SOURCE', style='Section.TLabel').grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 8))
         self.folder_var = tk.StringVar()
         self.title_var = tk.StringVar()
         self.season_var = tk.StringVar(value='1')
@@ -91,57 +306,79 @@ class App(tk.Tk):
         self.lang_var = tk.BooleanVar(value=True)
         self.force_var = tk.BooleanVar()
         self.start_var = tk.StringVar(value='1')
-        ttk.Label(form, text='输入文件夹').grid(row=0, column=0, sticky='w', padx=(0, 8))
-        ttk.Entry(form, textvariable=self.folder_var).grid(row=0, column=1, columnspan=5, sticky='ew', pady=4)
-        ttk.Button(form, text='选择…', command=self.choose_folder).grid(row=0, column=6, padx=8)
-        ttk.Label(form, text='默认作品名').grid(row=1, column=0, sticky='w')
-        ttk.Entry(form, textvariable=self.title_var, width=26).grid(row=1, column=1, sticky='ew', pady=4)
-        ttk.Label(form, text='默认季度').grid(row=1, column=2, padx=8)
-        ttk.Spinbox(form, from_=0, to=99, width=5, textvariable=self.season_var).grid(row=1, column=3)
-        ttk.Label(form, text='命名规则').grid(row=1, column=4, padx=8)
-        cb = ttk.Combobox(form, values=list(TEMPLATES), textvariable=self.template_name_var, state='readonly')
-        cb.grid(row=1, column=5, sticky='ew')
+
+        def field_label(text, row, col):
+            ttk.Label(form_card, text=text, style='MutedPanel.TLabel').grid(row=row, column=col, sticky='w', padx=(0, 8), pady=5)
+
+        field_label('输入文件夹', 1, 0)
+        ttk.Entry(form_card, textvariable=self.folder_var).grid(row=1, column=1, columnspan=5, sticky='ew', pady=5)
+        ttk.Button(form_card, text='浏览', command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
+
+        field_label('作品名称', 2, 0)
+        ttk.Entry(form_card, textvariable=self.title_var, width=26).grid(row=2, column=1, sticky='ew', pady=5)
+        field_label('季度', 2, 2)
+        ttk.Spinbox(form_card, from_=0, to=99, width=5, textvariable=self.season_var).grid(row=2, column=3, sticky='ew')
+        field_label('命名规则', 2, 4)
+        cb = ttk.Combobox(form_card, values=list(TEMPLATES), textvariable=self.template_name_var, state='readonly')
+        cb.grid(row=2, column=5, sticky='ew')
         cb.bind('<<ComboboxSelected>>', self.on_template_change)
-        ttk.Label(form, text='模板').grid(row=2, column=0, sticky='w')
-        self.template_entry = ttk.Entry(form, textvariable=self.template_var, state='disabled')
-        self.template_entry.grid(row=2, column=1, columnspan=5, sticky='ew', pady=4)
-        ttk.Button(form, text='刷新预览', command=self.scan).grid(row=2, column=6, padx=8)
-        ttk.Label(form, text='操作方式').grid(row=3, column=0, sticky='w')
-        ttk.Combobox(form, textvariable=self.mode_var, state='readonly',
-                     values=['原地重命名', '复制整理（保留原文件）']).grid(row=3, column=1, sticky='ew', pady=4)
-        ttk.Label(form, text='复制到').grid(row=3, column=2, padx=8)
-        self.output_entry = ttk.Entry(form, textvariable=self.output_var)
-        self.output_entry.grid(row=3, column=3, columnspan=3, sticky='ew')
-        ttk.Button(form, text='选择…', command=self.choose_output).grid(row=3, column=6, padx=8)
-        opts = ttk.Frame(form)
-        opts.grid(row=4, column=0, columnspan=7, sticky='w', pady=8)
+        ttk.Button(form_card, text='扫描文件', command=self.scan, style='Primary.TButton').grid(row=2, column=6, padx=(8, 0))
+
+        field_label('模板', 3, 0)
+        self.template_entry = ttk.Entry(form_card, textvariable=self.template_var, state='disabled')
+        self.template_entry.grid(row=3, column=1, columnspan=5, sticky='ew', pady=5)
+        ttk.Label(form_card, text='支持 {title} / {season} / {episode}', style='MutedPanel.TLabel').grid(row=3, column=6, sticky='w', padx=(8, 0))
+
+        field_label('操作方式', 4, 0)
+        ttk.Combobox(form_card, textvariable=self.mode_var, state='readonly',
+                     values=['原地重命名', '复制整理（保留原文件）']).grid(row=4, column=1, sticky='ew', pady=5)
+        field_label('复制到', 4, 2)
+        self.output_entry = ttk.Entry(form_card, textvariable=self.output_var)
+        self.output_entry.grid(row=4, column=3, columnspan=3, sticky='ew')
+        ttk.Button(form_card, text='选择', command=self.choose_output, style='Ghost.TButton').grid(row=4, column=6, padx=(8, 0))
+
+        opts = ttk.Frame(form_card, style='Panel.TFrame')
+        opts.grid(row=5, column=0, columnspan=7, sticky='w', pady=(10, 2))
         for text, variable in [('包含子文件夹', self.recursive_var), ('联动字幕', self.sub_var),
                                ('保留字幕语言', self.lang_var), ('每组全部正片按排序编号', self.force_var)]:
-            ttk.Checkbutton(opts, text=text, variable=variable).pack(side='left', padx=(0, 12))
-        ttk.Label(opts, text='起始集').pack(side='left')
-        ttk.Spinbox(opts, from_=1, to=9999, textvariable=self.start_var, width=5).pack(side='left', padx=4)
-        form.columnconfigure(1, weight=2)
-        form.columnconfigure(5, weight=2)
-        toolbar = ttk.Frame(outer)
-        toolbar.pack(fill='x', pady=(12, 6))
-        for label, callback in [('设置所选分组', self.edit_group), ('纠正集数 / 特别篇', self.edit_item),
-                                ('跳过 / 恢复所选', self.toggle_skip), ('清除所选纠正', self.clear_override)]:
-            ttk.Button(toolbar, text=label, command=callback).pack(side='left', padx=(0, 8))
-        ttk.Label(toolbar, text='双击文件纠正；空格切换跳过', foreground='#666666').pack(side='right')
-        preview = ttk.Frame(outer)
+            ttk.Checkbutton(opts, text=text, variable=variable).pack(side='left', padx=(0, 14))
+        ttk.Label(opts, text='起始集', style='MutedPanel.TLabel').pack(side='left')
+        ttk.Spinbox(opts, from_=1, to=9999, textvariable=self.start_var, width=6).pack(side='left', padx=6)
+        form_card.columnconfigure(1, weight=2)
+        form_card.columnconfigure(5, weight=2)
+
+        # Action strip
+        toolbar = ttk.Frame(main, style='App.TFrame')
+        toolbar.pack(fill='x', pady=(10, 8))
+        ttk.Button(toolbar, text='设置所选分组', command=self.edit_group).pack(side='left', padx=(0, 7))
+        ttk.Button(toolbar, text='纠正集数 / 特别篇', command=self.edit_item).pack(side='left', padx=(0, 7))
+        ttk.Button(toolbar, text='跳过 / 恢复', command=self.toggle_skip).pack(side='left', padx=(0, 7))
+        ttk.Button(toolbar, text='清除纠正', command=self.clear_override, style='Ghost.TButton').pack(side='left', padx=(0, 7))
+        ttk.Label(toolbar, text='双击文件纠正 · 空格切换跳过', style='Muted.TLabel').pack(side='right')
+
+        # Preview card
+        preview_card = ttk.Frame(main, style='Panel.TFrame', padding=(10, 10))
+        preview_card.pack(fill='both', expand=True)
+        preview_head = ttk.Frame(preview_card, style='Panel.TFrame')
+        preview_head.pack(fill='x', pady=(0, 7))
+        ttk.Label(preview_head, text='02  未来记录 / RENAME PREVIEW', style='Section.TLabel').pack(side='left')
+        ttk.Label(preview_head, text='绿色 = 可执行    橙色 = 待确认    红色 = 冲突', style='MutedPanel.TLabel').pack(side='right')
+
+        preview = ttk.Frame(preview_card, style='Panel.TFrame')
         preview.pack(fill='both', expand=True)
         cols = ('kind', 'old', 'detected', 'new', 'status')
         self.tree = ttk.Treeview(preview, columns=cols, show='tree headings', selectmode='extended')
-        self.tree.heading('#0', text='分组')
-        self.tree.column('#0', width=155, minwidth=100)
-        for col, label, width in [('kind', '类型', 50), ('old', '原文件名', 255),
-                                  ('detected', '集数 / 类型', 100), ('new', '目标文件名', 255),
-                                  ('status', '状态', 220)]:
+        self.tree.heading('#0', text='分组 / GROUP')
+        self.tree.column('#0', width=170, minwidth=110)
+        for col, label, width in [('kind', '类型', 55), ('old', '原文件名', 255),
+                                  ('detected', '识别结果', 105), ('new', '目标文件名', 255),
+                                  ('status', '状态', 200)]:
             self.tree.heading(col, text=label)
-            self.tree.column(col, width=width, minwidth=50)
-        self.tree.tag_configure('warning', foreground='#9b4700')
-        self.tree.tag_configure('error', foreground='#b00020')
-        self.tree.tag_configure('skipped', foreground='#777777')
+            self.tree.column(col, width=width, minwidth=55)
+        self.tree.tag_configure('ready', foreground='#7CF6D9')
+        self.tree.tag_configure('warning', foreground=c['warning'])
+        self.tree.tag_configure('error', foreground=c['error'])
+        self.tree.tag_configure('skipped', foreground='#746B73')
         ybar = ttk.Scrollbar(preview, orient='vertical', command=self.tree.yview)
         xbar = ttk.Scrollbar(preview, orient='horizontal', command=self.tree.xview)
         self.tree.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
@@ -153,16 +390,25 @@ class App(tk.Tk):
         self.tree.bind('<Double-1>', lambda e: self.edit_item())
         self.tree.bind('<space>', lambda e: self.toggle_skip())
         self.tree.bind('<<TreeviewSelect>>', self.show_detail)
-        self.detail_var = tk.StringVar(value='待确认的文件不会自动执行；请纠正集数或选择跳过。')
-        ttk.Label(outer, textvariable=self.detail_var, wraplength=1150).pack(fill='x', pady=(8, 4))
-        bottom = ttk.Frame(outer)
-        bottom.pack(fill='x')
-        self.status_var = tk.StringVar(value='选择文件夹，填写默认作品名或分别设置各组名称。')
-        ttk.Label(outer, textvariable=self.status_var, wraplength=1150).pack(fill='x', pady=(8, 0))
-        ttk.Button(bottom, text='恢复中断操作', command=self.recover).pack(side='left')
-        ttk.Button(bottom, text='撤销上次操作', command=self.undo).pack(side='left', padx=8)
-        self.run_btn = ttk.Button(bottom, text='执行预览中的操作', command=self.execute, state='disabled')
+
+        # Detail/status bar
+        detail_card = ttk.Frame(main, style='Card.TFrame', padding=(11, 8))
+        detail_card.pack(fill='x', pady=(8, 0))
+        self.detail_var = tk.StringVar(value='待确认的文件不会执行。若识别不正确，请双击对应文件进行纠正。')
+        ttk.Label(detail_card, text='DIARY LOG', style='Cyan.TLabel').pack(anchor='w')
+        ttk.Label(detail_card, textvariable=self.detail_var, style='Card.TLabel', wraplength=1000).pack(fill='x', pady=(2, 0))
+
+        footer = ttk.Frame(main, style='App.TFrame')
+        footer.pack(fill='x', pady=(9, 0))
+        left_footer = ttk.Frame(footer, style='App.TFrame')
+        left_footer.pack(side='left', fill='x', expand=True)
+        self.status_var = tk.StringVar(value='选择文件夹，填写作品名，然后扫描未来记录。')
+        ttk.Label(left_footer, textvariable=self.status_var, style='Muted.TLabel', wraplength=700).pack(anchor='w')
+        ttk.Button(footer, text='恢复中断操作', command=self.recover, style='Ghost.TButton').pack(side='left', padx=(8, 0))
+        ttk.Button(footer, text='撤销上次操作', command=self.undo, style='Danger.TButton').pack(side='left', padx=8)
+        self.run_btn = ttk.Button(footer, text='改写未来 · 执行', command=self.execute, state='disabled', style='Primary.TButton')
         self.run_btn.pack(side='right')
+
         for variable in [self.folder_var, self.title_var, self.season_var, self.template_var,
                          self.mode_var, self.output_var, self.recursive_var, self.sub_var,
                          self.lang_var, self.force_var, self.start_var]:
@@ -275,7 +521,7 @@ class App(tk.Tk):
                 label = item.group + (' → ' + options.title if options.title else '')
                 self.tree.insert('', 'end', iid=node, text=label, open=True)
             status = item.status
-            tag = 'error' if status.startswith(('冲突', '错误')) else ('warning' if status.startswith(('待',)) else ('skipped' if status == '已跳过' else ''))
+            tag = 'error' if status.startswith(('冲突', '错误')) else ('warning' if status.startswith(('待',)) else ('skipped' if status == '已跳过' else ('ready' if status == READY else '')))
             self.tree.insert(nodes[item.group_id], 'end', iid=f'r{index}', values=(
                 item.kind, Path(item.old_path).name, item.detected,
                 Path(item.new_path).name if item.new_path != item.old_path else '—', status), tags=(tag,))
