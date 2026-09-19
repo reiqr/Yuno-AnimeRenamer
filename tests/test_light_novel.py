@@ -1,7 +1,12 @@
 import tempfile
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+_UI_DIR = Path(__file__).resolve().parents[1] / 'ui'
+if str(_UI_DIR) not in sys.path:
+    sys.path.insert(0, str(_UI_DIR))
 import runpy
 
 import file_operations as ops

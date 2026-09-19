@@ -9,6 +9,17 @@ Windows 离线番剧与字幕整理工具。先识别并查看预览，再执行
 - 兼容入口：旧中文名脚本 `运行 AnimeRenamer.bat` 与 `生成EXE.bat` 仍然保留可用；新用户建议使用英文名脚本。若旧构建脚本与当前说明不一致，以 `build_exe.bat` 为准。
 - 源码与后续 Git 历史固定保存在 `AnimeRenamer` 目录；旁边的旧版本目录和 ZIP 保留作为原始交付备份。
 
+## 仓库目录
+
+- `AnimeRenamer.pyw`：程序入口。
+- `renamer_core.py` / `file_operations.py`：识别与文件操作核心。
+- `ui/`：界面、主题、弹窗、轻小说模式等 UI 模块。
+- `assets/`：程序实际使用的图片和图标素材。
+- `tools/`：发布打包、Windows 版本信息、图标缓存维护工具。
+- `tests/`：回归测试；`benchmarks/`：性能基准；`history/`：历史 Preview 资料。
+
+根目录只保留用户入口、核心模块和项目级文档，避免后续功能继续堆散文件。
+
 ## 使用流程
 
 1. 选择输入文件夹。可选“包含子文件夹”。
@@ -90,7 +101,7 @@ python -m unittest discover -s tests -v
 使用 UTF-8 标记的 ZIP 发布源码，防止中文脚本名乱码：
 
 ```powershell
-python package_release.py
+python tools/package_release.py
 ```
 
 发布包输出到 `dist`，ZIP 仅包含源码、测试、文档、启动/构建脚本和 EXE（已构建时），不包含 Git、缓存或真实媒体文件。
@@ -114,5 +125,5 @@ python package_release.py
 - 侧边栏角色图以安全的头部与发丝留白从高分辨率源重新裁切；`assets/yuno_sidebar_hd.png` 保留为高分辨率派生源。
 - 打包 EXE 输出为 `dist/AnimeRenamer_FutureDiary.exe`，避免资源管理器复用旧 `AnimeRenamer.exe` 的图标缓存。
 - `build_exe.bat` 每次构建前只清理 `build/`、生成的 `.spec` 和同名目标 EXE，不删除 `dist/` 中其他文件；也不会自动安装或升级依赖。
-- 若资源管理器仍显示旧图标，运行一次 `refresh_icon_cache.bat` 后重开文件夹。
+- 若资源管理器仍显示旧图标，运行一次 `tools/refresh_icon_cache.bat` 后重开文件夹。
 - 界面字体仅使用已安装的 Windows 字体：中文用微软雅黑 UI，拉丁标题用 Bahnschrift/Segoe UI，日文用 Yu Gothic UI，终端风格标签用 Cascadia Mono/Consolas。不打包任何字体文件。

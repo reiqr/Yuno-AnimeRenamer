@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 
 def _enable_windows_dpi_awareness():
@@ -26,6 +27,11 @@ def _enable_windows_dpi_awareness():
 
 
 _enable_windows_dpi_awareness()
+
+_ROOT = Path(__file__).resolve().parent
+_UI_DIR = _ROOT / 'ui'
+if str(_UI_DIR) not in sys.path:
+    sys.path.insert(0, str(_UI_DIR))
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk

@@ -36,7 +36,8 @@ if exist "dist\AnimeRenamer_FutureDiary.exe" del /q "dist\AnimeRenamer_FutureDia
 
 %PY% -m PyInstaller --noconfirm --clean --onefile --windowed --noupx ^
   --name AnimeRenamer_FutureDiary ^
-  --version-file "%CD%\windows_version_info.txt" ^
+  --paths "%CD%\ui" ^
+  --version-file "%CD%\tools\windows_version_info.txt" ^
   --icon "%CD%\assets\app_icon.ico" ^
   --add-data "%CD%\assets;assets" ^
   --distpath "%CD%\dist" ^
@@ -49,7 +50,7 @@ echo Build complete:
 echo   dist\AnimeRenamer_FutureDiary.exe
 echo.
 echo Existing unrelated files in dist were preserved.
-echo If Explorer still shows an old icon, run refresh_icon_cache.bat once.
+echo If Explorer still shows an old icon, run tools\refresh_icon_cache.bat once.
 echo.
 pause
 exit /b 0

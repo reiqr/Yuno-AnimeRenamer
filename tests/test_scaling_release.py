@@ -4,7 +4,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-import package_release as release
+from tools import package_release as release
 import renamer_core as core
 
 
