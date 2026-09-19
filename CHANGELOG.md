@@ -2,7 +2,7 @@
 
 ## 2026-09-19：Preview 19 系列与功能收尾
 
-- 增加 Noto CJK 视觉试验：Windows 构建内嵌 Noto Sans CJK SC 与 Noto Sans Mono CJK SC 的 Regular/Bold，使用进程私有字体加载，不安装到系统；彩色状态文字颜色保持不变，中性白字改为更柔和的层级。
+- 撤回 Noto CJK 内嵌字体视觉试验，恢复系统已安装字体组合，避免字体资源显著增大 EXE 体积；现有粉色、青色、黄色、红色状态色保持不变。
 - 增加自动 Windows 构建版本号：产品版本继续读取 `renamer_core.VERSION`，EXE `FileVersion` 自动追加 CI 运行号或本地 Git 提交计数；编译产物文件名同步使用完整版本，例如 `AnimeRenamer_FutureDiary_v0.3.1.57.exe`。
 - 增加发布字体保护：发布包拒绝捆绑字体文件，并新增 DPI 初始化顺序与 UI 字号范围回归检查。
 - 项目目录重新整理：核心模块继续保留在仓库根目录，界面代码集中到 `ui/`，资源集中到 `assets/`，工具脚本集中到 `tools/`，历史 Preview 资料移入 `history/`。

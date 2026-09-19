@@ -21,14 +21,6 @@ from renamer_core import VERSION
 from tools.generate_version_info import exe_filename, resolve_build_number
 
 FONT_SUFFIXES = {'.ttf', '.otf', '.ttc', '.woff', '.woff2'}
-APPROVED_BUNDLED_FONTS = {
-    'assets/fonts/NotoSansCJKsc-Regular.otf',
-    'assets/fonts/NotoSansCJKsc-Bold.otf',
-    'assets/fonts/NotoSansMonoCJKsc-Regular.otf',
-    'assets/fonts/NotoSansMonoCJKsc-Bold.otf',
-}
-FONT_LICENSE = 'assets/fonts/OFL.txt'
-
 
 def _git_commit_count(root):
     try:
@@ -104,13 +96,9 @@ def package():
     if assets.is_dir():
         font_assets = [p for p in assets.rglob('*')
                        if p.is_file() and p.suffix.lower() in FONT_SUFFIXES]
-        unapproved = [p for p in font_assets
-                      if p.relative_to(root).as_posix() not in APPROVED_BUNDLED_FONTS]
-        if unapproved:
-            names = ', '.join(p.relative_to(root).as_posix() for p in unapproved)
-            raise RuntimeError(f'发布包发现未批准字体文件：{names}')
-        if font_assets and not (root / FONT_LICENSE).is_file():
-            raise RuntimeError('已包含主题字体，但缺少 assets/fonts/OFL.txt')
+        if font_assets:
+            names = ', '.join(p.relative_to(root).as_posix() for p in font_assets)
+            raise RuntimeError(f'发布包禁止包含字体文件：{names}')
         files += [(p, p.relative_to(root).as_posix())
                   for p in sorted(assets.rglob('*')) if p.is_file()]
 
@@ -154,11 +142,7 @@ def package():
             assert prefix + exe.name in names
         assert prefix + 'AnimeRenamer.exe' not in names
         assert prefix + 'AnimeRenamer_FutureDiary.exe' not in names
-        font_entries = {name.removeprefix(prefix) for name in names
-                        if Path(name).suffix.lower() in FONT_SUFFIXES}
-        assert font_entries <= APPROVED_BUNDLED_FONTS
-        if font_entries:
-            assert prefix + FONT_LICENSE in names
+        assert not any(Path(name).suffix.lower() in FONT_SUFFIXES for name in names)
 
     print(archive)
     return archive

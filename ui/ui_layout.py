@@ -242,7 +242,7 @@ class LayoutMixin:
             self.transfer_frame, orient='horizontal', mode='determinate', maximum=100.0,
             variable=self.transfer_progress_var, length=220)
         self.transfer_bar.pack(side='left', fill='x', expand=True, padx=(2, 8), pady=5)
-        tk.Label(self.transfer_frame, textvariable=self.transfer_detail_var, bg='#121017', fg=c['text_secondary'],
+        tk.Label(self.transfer_frame, textvariable=self.transfer_detail_var, bg='#121017', fg='#AFA2AB',
                  anchor='e', font=(self.FONTS['body'], 8)).pack(side='left', padx=(0, 8))
         self.cancel_copy_btn = ttk.Button(
             self.transfer_frame, text='取消复制', command=self.cancel_current_copy, style='Danger.TButton')
@@ -258,8 +258,8 @@ class LayoutMixin:
                  font=(self.FONTS['mono'], 8, 'bold')).pack(side='left')
         self.detail_entry = tk.Entry(
             info_rail, textvariable=self.detail_var, state='readonly', readonlybackground='#121017',
-            fg=c['text_secondary'], relief='flat', bd=0, highlightthickness=0,
-            selectbackground='#4A1F39', selectforeground=c['text_strong'],
+            fg='#B9ABB5', relief='flat', bd=0, highlightthickness=0,
+            selectbackground='#4A1F39', selectforeground='#FFFFFF',
             font=(self.FONTS['body'], 8))
         self.detail_entry.pack(side='left', fill='x', expand=True, padx=(0, 6), ipady=1)
         self.copy_detail_btn = tk.Button(
@@ -267,7 +267,7 @@ class LayoutMixin:
             activebackground='#243134', activeforeground='#8FFFF6', relief='flat', bd=0,
             padx=7, pady=2, cursor='hand2', font=(self.FONTS['mono'], 8, 'bold'))
         self.copy_detail_btn.pack(side='right', padx=(0, 6))
-        tk.Label(info_rail, textvariable=self.status_var, bg='#121017', fg=c['text_secondary'], anchor='e',
+        tk.Label(info_rail, textvariable=self.status_var, bg='#121017', fg='#A79AA4', anchor='e',
                  font=(self.FONTS['body'], 8)).pack(side='right', padx=(8, 8))
 
         # Preview card gets the strongest boundary and owns most of the vertical space.
@@ -358,11 +358,11 @@ class LayoutMixin:
         empty_text.pack(side='left', fill='both', expand=True, pady=(11, 8), padx=(0, 10))
         self.empty_title_var = tk.StringVar(value='尚未读取未来')
         self.empty_sub_var = tk.StringVar(value='选择文件夹并扫描后，重命名预览会显示在这里。')
-        tk.Label(empty_text, textvariable=self.empty_title_var, bg='#121017', fg=c['text'],
+        tk.Label(empty_text, textvariable=self.empty_title_var, bg='#121017', fg='#EADFE7',
                  font=(self.FONTS['display'], 11, 'bold'), anchor='w').pack(fill='x')
         tk.Label(empty_text, text='WAITING FOR DIARY DATA', bg='#121017', fg='#6FCBC5',
                  font=(self.FONTS['mono'], 8, 'bold'), anchor='w').pack(fill='x', pady=(2, 6))
-        tk.Label(empty_text, textvariable=self.empty_sub_var, bg='#121017', fg=c['muted'],
+        tk.Label(empty_text, textvariable=self.empty_sub_var, bg='#121017', fg='#887D85',
                  wraplength=300, justify='left', anchor='w', font=(self.FONTS['body'], 9)).pack(fill='x')
 
         for variable in [self.folder_var, self.title_var, self.season_var, self.template_name_var, self.template_var,
