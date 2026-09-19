@@ -104,16 +104,17 @@ def render_version_info(build: int, version: str = VERSION) -> str:
 """
 
 
-def generate(output: str | Path, build: int | None = None) -> Path:
+def generate(output: str | Path, build: int | None = None, version: str = VERSION) -> Path:
     build_number = resolve_build_number(build)
+    parse_product_version(version)
     target = Path(output)
     if not target.is_absolute():
         target = ROOT / target
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(render_version_info(build_number), encoding="utf-8")
-    print(f"ProductVersion: {VERSION}")
-    print(f"FileVersion: {full_version(build_number)}")
-    print(f"Executable: {exe_filename(build_number)}")
+    target.write_text(render_version_info(build_number, version), encoding="utf-8")
+    print(f"ProductVersion: {version}")
+    print(f"FileVersion: {full_version(build_number, version)}")
+    print(f"Executable: {exe_filename(build_number, version)}")
     print(target)
     return target
 
@@ -122,9 +123,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Windows version info for PyInstaller")
     parser.add_argument("--output", default="build/windows_version_info.txt")
     parser.add_argument("--build", type=int, default=None)
+    parser.add_argument("--product-version", default=VERSION)
+    parser.add_argument("--print-exe-basename", action="store_true")
     args = parser.parse_args()
     try:
-        generate(args.output, args.build)
+        build_number = resolve_build_number(args.build)
+        version = args.product_version.strip()
+        parse_product_version(version)
+        if args.print_exe_basename:
+            print(exe_basename(build_number, version))
+        else:
+            generate(args.output, build_number, version)
     except (OSError, ValueError) as exc:
         print(f"version info generation failed: {exc}", file=sys.stderr)
         return 1

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -35,6 +36,24 @@ if str(_UI_DIR) not in sys.path:
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
+
+import renamer_core as _renamer_core
+
+
+def _runtime_product_version(default):
+    """Use the product version embedded in a versioned frozen EXE filename."""
+    if not getattr(sys, 'frozen', False):
+        return default
+    name = Path(sys.executable).name
+    match = re.fullmatch(
+        r'AnimeRenamer_FutureDiary_v(\d+\.\d+\.\d+)(?:\.\d+)?\.exe',
+        name,
+        flags=re.IGNORECASE,
+    )
+    return match.group(1) if match else default
+
+
+_renamer_core.VERSION = _runtime_product_version(_renamer_core.VERSION)
 
 from renamer_core import (VERSION, READY, GroupSettings, build_plan, parse_override,
                           execute_plan, undo_last, recover_pending, pending_operation)

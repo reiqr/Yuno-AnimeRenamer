@@ -8,6 +8,20 @@ from ui_theme import ThemeToggle
 
 
 class LayoutMixin:
+    def _sync_scan_button_after_start(self):
+        # Only switch wording after a scan task really started. Invalid/cancelled input
+        # keeps the first-run wording as “扫描文件”.
+        if getattr(self, 'busy', False) and hasattr(self, 'scan_btn'):
+            self.scan_btn.configure(text='刷新预览')
+
+    def _scan_from_source_card(self):
+        self.scan()
+        self._sync_scan_button_after_start()
+
+    def _choose_folder_from_source_card(self):
+        self.choose_folder()
+        self._sync_scan_button_after_start()
+
     def _build_ui(self):
         self._configure_theme()
         c = self.COLORS
@@ -140,7 +154,8 @@ class LayoutMixin:
         field_label('文件夹', 1, 0, 'folder')
         ttk.Entry(form_card, textvariable=self.folder_var).grid(row=1, column=1, columnspan=5, sticky='ew', pady=4, padx=(0, 2))
         ttk.Button(form_card, text='浏览', image=self.UI_ICONS['folder'], compound='left',
-                   command=self.choose_folder, style='Ghost.TButton').grid(row=1, column=6, padx=(8, 0))
+                   command=self._choose_folder_from_source_card, style='Ghost.TButton').grid(
+                       row=1, column=6, padx=(8, 0))
 
         field_label('作品', 2, 0, 'title')
         ttk.Entry(form_card, textvariable=self.title_var, width=26).grid(row=2, column=1, sticky='ew', pady=4, padx=(0, 8))
@@ -150,8 +165,8 @@ class LayoutMixin:
         cb = ttk.Combobox(form_card, values=list(TEMPLATES), textvariable=self.template_name_var, state='readonly')
         cb.grid(row=2, column=5, sticky='ew')
         cb.bind('<<ComboboxSelected>>', self.on_template_change)
-        self.scan_btn = ttk.Button(form_card, text='刷新预览', image=self.UI_ICONS['scan'], compound='left',
-                                   command=self.scan, style='Primary.TButton')
+        self.scan_btn = ttk.Button(form_card, text='扫描文件', image=self.UI_ICONS['scan'], compound='left',
+                                   command=self._scan_from_source_card, style='Primary.TButton')
         self.scan_btn.grid(row=2, column=6, padx=(8, 0))
 
         self.template_label = field_label('模板', 3, 0, 'rule')
@@ -245,7 +260,7 @@ class LayoutMixin:
             info_rail, textvariable=self.detail_var, state='readonly', readonlybackground='#121017',
             fg='#B9ABB5', relief='flat', bd=0, highlightthickness=0,
             selectbackground='#4A1F39', selectforeground='#FFFFFF',
-            font=(self.FONTS['body'], 9))
+            font=(self.FONTS['body'], 8))
         self.detail_entry.pack(side='left', fill='x', expand=True, padx=(0, 6), ipady=1)
         self.copy_detail_btn = tk.Button(
             info_rail, text='COPY', command=self.copy_selected_detail, bg='#17131A', fg=c['cyan'],

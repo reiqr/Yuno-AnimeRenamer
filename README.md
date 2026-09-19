@@ -154,10 +154,14 @@ dist\AnimeRenamer_FutureDiary_v0.3.0.57.exe
 - `ProductVersion` 直接读取 `renamer_core.VERSION`，仍是项目发布版本，例如 `0.3.0`；
 - `FileVersion` 追加自动构建号，例如 `0.3.0.57`；
 - EXE 文件名使用与 `FileVersion` 相同的完整版本号；
-- GitHub Actions 使用 `github.run_number` 作为构建号；
-- 本地 `build_exe.bat` 使用当前 Git 提交数量作为构建号；若源码不在 Git 仓库中则使用 `0`。
+- GitHub Actions 使用源码中的 `renamer_core.VERSION` 作为产品版本，并使用 `github.run_number` 作为构建号；
+- 本地 `build_exe.bat` 启动时会先询问本次产品版本，可直接输入三段版本号，例如 `0.3.1`；
+- 本地构建如果直接回车不输入，才默认使用 `renamer_core.VERSION`；
+- 构建号仍自动使用当前 Git 提交数量；若源码不在 Git 仓库中则使用 `0`；
+- 因此输入 `0.3.1` 后，若当前自动构建号为 `58`，会生成 `AnimeRenamer_FutureDiary_v0.3.1.58.exe`，其 `ProductVersion` 为 `0.3.1`、`FileVersion` 为 `0.3.1.58`；
+- 版本化 EXE 启动时会从自身文件名读取产品版本，所以标题栏和左下角版本显示也会与本次构建版本一致；源码直接运行时仍使用 `renamer_core.VERSION`。
 
-因此每次 CI 新构建都能直接从文件名和 EXE 属性中区分，同时产品版本仍只维护一个来源。仓库中的旧 `tools/windows_version_info.txt` 仅保留为历史兼容参考，正式构建和发布包不再依赖它。
+本地手工版本只影响本次 EXE 构建，不会自动改写 `renamer_core.py`。正式发布时如需永久升级项目版本，仍建议同步更新 `renamer_core.VERSION`。仓库中的旧 `tools/windows_version_info.txt` 仅保留为历史兼容参考，正式构建和发布包不再依赖它。
 
 构建脚本会使用 `assets\app_icon.ico` 作为 Windows EXE 图标，并把 `assets/` 一并打包。脚本只清理 `build/`、生成的 `.spec` 和**当前同版本目标 EXE**，不会清空整个 `dist/` 目录，也不会删除其他旧版本 EXE 或发布 ZIP。
 

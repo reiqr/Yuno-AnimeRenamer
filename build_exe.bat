@@ -7,6 +7,20 @@ set "PY=python"
 where python >nul 2>nul
 if errorlevel 1 set "PY=py -3"
 
+set "DEFAULT_VERSION="
+for /f "delims=" %%I in ('%PY% -c "from renamer_core import VERSION; print(VERSION)" 2^>nul') do set "DEFAULT_VERSION=%%I"
+if not defined DEFAULT_VERSION goto :version_read_error
+
+echo.
+echo Current product version: %DEFAULT_VERSION%
+set "PRODUCT_VERSION="
+set /p "PRODUCT_VERSION=Release version [blank = %DEFAULT_VERSION%]: "
+if not defined PRODUCT_VERSION set "PRODUCT_VERSION=%DEFAULT_VERSION%"
+
+set "BUILD_NO="
+for /f %%I in ('git rev-list --count HEAD 2^>nul') do set "BUILD_NO=%%I"
+if not defined BUILD_NO set "BUILD_NO=0"
+
 rem Only clear generated build cache/spec files. Never delete the whole dist directory.
 if exist build rmdir /s /q build
 if exist AnimeRenamer.spec del /q AnimeRenamer.spec
@@ -31,23 +45,33 @@ if errorlevel 1 (
   goto :fail
 )
 
-set "BUILD_NO="
-for /f %%I in ('git rev-list --count HEAD 2^>nul') do set "BUILD_NO=%%I"
-if not defined BUILD_NO set "BUILD_NO=0"
-
-%PY% tools\generate_version_info.py --output build\windows_version_info.txt --build %BUILD_NO%
-if errorlevel 1 goto :fail
+%PY% tools\generate_version_info.py --output build\windows_version_info.txt --build %BUILD_NO% --product-version "%PRODUCT_VERSION%"
+if errorlevel 1 goto :bad_version
 
 set "EXE_BASE="
-for /f "delims=" %%I in ('%PY% -c "from tools.generate_version_info import exe_basename; print(exe_basename(%BUILD_NO%))"') do set "EXE_BASE=%%I"
+for /f "delims=" %%I in ('%PY% tools\generate_version_info.py --build %BUILD_NO% --product-version "%PRODUCT_VERSION%" --print-exe-basename') do set "EXE_BASE=%%I"
 if not defined EXE_BASE (
   echo Failed to resolve versioned EXE name.
   goto :fail
 )
 
+echo.
+echo Resolved build:
+echo   ProductVersion = %PRODUCT_VERSION%
+echo   BuildNumber    = %BUILD_NO%
+echo   EXE            = %EXE_BASE%.exe
+echo.
+
 if not exist dist mkdir dist
 rem Remove only the exact current build target. Preserve older builds and unrelated dist files.
-if exist "dist\%EXE_BASE%.exe" del /q "dist\%EXE_BASE%.exe"
+rem Retry short-lived Explorer/antivirus locks; never kill processes automatically.
+for /l %%R in (1,1,3) do (
+  if exist "dist\%EXE_BASE%.exe" (
+    del /f /q "dist\%EXE_BASE%.exe" >nul 2>nul
+    if exist "dist\%EXE_BASE%.exe" timeout /t 1 /nobreak >nul
+  )
+)
+if exist "dist\%EXE_BASE%.exe" goto :locked_exe
 
 %PY% -m PyInstaller --noconfirm --clean --onefile --windowed --noupx ^
   --name "%EXE_BASE%" ^
@@ -63,13 +87,38 @@ if errorlevel 1 goto :fail
 echo.
 echo Build complete:
 echo   dist\%EXE_BASE%.exe
-echo   FileVersion and EXE filename use the current Git commit count as the build number.
+echo   ProductVersion: %PRODUCT_VERSION%
+echo   FileVersion: %PRODUCT_VERSION%.%BUILD_NO%
 echo.
 echo Existing unrelated files and older versioned builds in dist were preserved.
 echo If Explorer still shows an old icon or version, run tools\refresh_icon_cache.bat once.
 echo.
 pause
 exit /b 0
+
+:locked_exe
+echo.
+echo Cannot replace dist\%EXE_BASE%.exe because Windows is still using it.
+echo Close the running EXE first. If it is already closed, also close Explorer
+echo Preview/Details panes for this EXE and wait for antivirus scanning to finish.
+echo.
+echo Running process check:
+tasklist /fi "IMAGENAME eq %EXE_BASE%.exe" 2^>nul | findstr /i "%EXE_BASE%.exe"
+echo.
+echo Run build_exe.bat again after the lock is released.
+goto :fail
+
+:bad_version
+echo.
+echo Invalid release version.
+echo Please use x.y.z, for example 0.3.1.
+echo Press Enter at the version prompt to use the current source version automatically.
+goto :fail
+
+:version_read_error
+echo.
+echo Failed to read VERSION from renamer_core.py.
+goto :fail
 
 :fail
 echo.
