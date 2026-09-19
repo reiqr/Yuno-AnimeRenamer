@@ -30,6 +30,7 @@ Earlier work (Preview 1–3 / theme baseline) is already represented by normal r
 | 13 | `preview-13-assets.md` | banner-only composition revision, removing awkward half-face crop |
 | 14 | `preview-14.part01.patch` + `preview-14.part02.patch` + `preview-14.part03.patch` | near-1.0 UI finish: action hierarchy, scan animation, preview-first layout |
 | 15 | `preview-15-icon-build.md` | Windows `.ico`, Explorer/EXE icon and build packaging |
+| 16 | `preview-16.patch` | rebalance sidebar: lower artwork, distribute text into intro/flow/bottom zones |
 
 ## Source patch archive hashes
 
@@ -51,4 +52,4 @@ Earlier work (Preview 1–3 / theme baseline) is already represented by normal r
 - These are history/audit records. The archive branch is not intended to be used as the release branch.
 - Binary UI assets are represented by SHA256 manifests where direct binary archival through the connector was not appropriate.
 - Core rename/copy/undo behavior was intentionally kept unchanged throughout these UI previews.
-- The next UI iteration after this archive starts from the latest Preview 14 UI + Preview 13 banner assets + Preview 15 icon/build configuration.
+- Preview 16 continues from the latest Preview 14 UI + Preview 13 banner assets + Preview 15 icon/build configuration and only changes sidebar layout code.
