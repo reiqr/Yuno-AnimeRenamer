@@ -1,5 +1,20 @@
 # 更新记录
 
+## Future Diary UI 打包合集（2026-09-19）
+
+- 包含 Preview 16 界面、Preview 13 横幅构图、Preview 15 的 Windows 图标与构建配置。
+- 包含 `AnimeRenamer.pyw` 运行所需的全部主题素材。
+- 辅助脚本改用 ASCII 文件名（`run_app.bat`、`build_exe.bat`），降低 ZIP 与 Windows 中文文件名的编码问题。
+
+### Future Diary UI Preview 17
+
+- 在 Tk 初始化前启用 Windows 单显示器 DPI 感知，避免位图缩放导致界面模糊。
+- 在不降低素材与界面渲染分辨率的前提下，缩小初始窗口的物理尺寸。
+- 侧边栏角色图以完整头部的安全留白重新裁切，并保留 3 倍分辨率派生版本。
+- 拉丁文、中文、日文与终端风格文字分别使用已安装的 Windows 字体族。
+- 构建前清空产物，输出内嵌多尺寸 ICO 的 `AnimeRenamer_FutureDiary.exe`。
+- 新增 `refresh_icon_cache.bat`，用于处理资源管理器图标缓存过期。
+
 ## 0.3.0
 
 - 增加按目录和季号的分组预览，可单独设置组名称、季度、起始集。
@@ -15,17 +30,3 @@
 ## 0.2.1
 
 导入用户提供的版本，作为此次开发的 Git 基线。此前版本目录及压缩包保持原样。
-
-## Future Diary UI latest bundle (2026-09-19)
-- Includes Preview 16 UI, Preview 13 banner composition, Preview 15 Windows icon/build settings.
-- Includes all runtime theme assets required by AnimeRenamer.pyw.
-- Uses ASCII helper script names (`run_app.bat`, `build_exe.bat`) to reduce ZIP/Windows filename encoding issues.
-
-
-### Future Diary UI Preview 17
-- Enable Windows per-monitor DPI awareness before Tk initialization to prevent blurry bitmap-scaled UI.
-- Reduce the initial physical window size without reducing asset/UI rendering resolution.
-- Rebuild the sidebar portrait with a full-head safe crop and retain a 3x high-resolution derivative.
-- Distinguish Latin/Chinese/Japanese/terminal typography using installed Windows font families.
-- Clean EXE builds and output `AnimeRenamer_FutureDiary.exe` with the multi-size ICO embedded.
-- Add `refresh_icon_cache.bat` for stale Explorer icon caches.

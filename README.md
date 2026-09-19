@@ -6,6 +6,7 @@ Windows 离线番剧与字幕整理工具。先识别并查看预览，再执行
 
 - 已打包版本：双击 `AnimeRenamer.exe`，无需安装 Python。
 - 源码版本：安装 Python 3.10+，双击 `run_app.bat`，或运行 `python AnimeRenamer.pyw`。运行只使用标准库。
+- 兼容入口：旧中文名脚本 `运行 AnimeRenamer.bat` 与 `生成EXE.bat` 仍然保留可用，与 `run_app.bat` / `build_exe.bat` 等价；新用户建议使用英文名脚本。
 - 源码与后续 Git 历史固定保存在 `AnimeRenamer` 目录；旁边的旧版本目录和 ZIP 保留作为原始交付备份。
 
 ## 使用流程
@@ -87,7 +88,7 @@ python package_release.py
 发布包输出到 `dist`，ZIP 仅包含源码、测试、文档、启动/构建脚本和 EXE（已构建时），不包含 Git、缓存或真实媒体文件。
 
 
-## Future Diary UI latest bundle
+## Future Diary UI 打包合集
 
 本目录已经包含当前主题运行和打包所需的完整资源：
 
@@ -101,11 +102,11 @@ python package_release.py
 当前 UI 代码为 Preview 16 状态，包含此前 Preview 14 的成品化布局、Preview 13 的横幅构图、Preview 15 的 EXE 图标/构建配置以及 Preview 16 的左侧视觉重心修正。
 
 
-## Future Diary UI - current full build notes
+## Future Diary UI 当前构建说明
 
-- Windows DPI awareness is enabled before Tk creates the first window. This prevents Windows bitmap scaling from making the compact window blurry.
-- The sidebar portrait was rebuilt from the high-resolution source with a safe head/hair margin. `assets/yuno_sidebar_hd.png` is retained as the high-resolution source derivative.
-- The packaged EXE is built as `dist/AnimeRenamer_FutureDiary.exe` to avoid Windows Explorer reusing the icon cache of an older `AnimeRenamer.exe`.
-- `build_exe.bat` always removes old `build/`, `dist/`, and generated `.spec` files before building, and embeds both `assets/app_icon.ico` and the whole `assets/` directory.
-- If Explorer still shows a stale icon, run `refresh_icon_cache.bat` once and reopen the folder.
-- UI fonts use installed Windows fonts only: Microsoft YaHei UI for Chinese, Bahnschrift/Segoe UI for Latin headings, Yu Gothic UI for Japanese, and Cascadia Mono/Consolas for terminal-style labels. No font files are bundled.
+- 在 Tk 创建首个窗口前启用 Windows DPI 感知，避免 Windows 位图缩放使紧凑窗口变模糊。
+- 侧边栏角色图以安全的头部与发丝留白从高分辨率源重新裁切；`assets/yuno_sidebar_hd.png` 保留为高分辨率派生源。
+- 打包 EXE 输出为 `dist/AnimeRenamer_FutureDiary.exe`，避免资源管理器复用旧 `AnimeRenamer.exe` 的图标缓存。
+- `build_exe.bat` 每次构建前都会清空旧的 `build/`、`dist/` 和生成的 `.spec`，并内嵌 `assets/app_icon.ico` 与整个 `assets/` 目录。
+- 若资源管理器仍显示旧图标，运行一次 `refresh_icon_cache.bat` 后重开文件夹。
+- 界面字体仅使用已安装的 Windows 字体：中文用微软雅黑 UI，拉丁标题用 Bahnschrift/Segoe UI，日文用 Yu Gothic UI，终端风格标签用 Cascadia Mono/Consolas。不打包任何字体文件。
