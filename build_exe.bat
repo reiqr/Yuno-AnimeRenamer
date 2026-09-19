@@ -12,9 +12,10 @@ for /f "delims=" %%I in ('%PY% -c "from renamer_core import VERSION; print(VERSI
 if not defined DEFAULT_VERSION goto :version_read_error
 
 echo.
-echo Current product version: %DEFAULT_VERSION%
+echo Current project version: %DEFAULT_VERSION%
 set "PRODUCT_VERSION="
-set /p "PRODUCT_VERSION=Release version [blank = %DEFAULT_VERSION%]: "
+echo Enter another x.y.z only for a temporary build override; source VERSION will not change.
+set /p "PRODUCT_VERSION=Release version [Enter = %DEFAULT_VERSION%]: "
 if not defined PRODUCT_VERSION set "PRODUCT_VERSION=%DEFAULT_VERSION%"
 
 set "BUILD_NO="

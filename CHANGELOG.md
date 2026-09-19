@@ -3,7 +3,7 @@
 ## 2026-09-19：Preview 19 系列与功能收尾
 
 - 增加 Noto CJK 视觉试验：Windows 构建内嵌 Noto Sans CJK SC 与 Noto Sans Mono CJK SC 的 Regular/Bold，使用进程私有字体加载，不安装到系统；彩色状态文字颜色保持不变，中性白字改为更柔和的层级。
-- 增加自动 Windows 构建版本号：产品版本继续读取 `renamer_core.VERSION`，EXE `FileVersion` 自动追加 CI 运行号或本地 Git 提交计数；编译产物文件名同步使用完整版本，例如 `AnimeRenamer_FutureDiary_v0.3.0.57.exe`。
+- 增加自动 Windows 构建版本号：产品版本继续读取 `renamer_core.VERSION`，EXE `FileVersion` 自动追加 CI 运行号或本地 Git 提交计数；编译产物文件名同步使用完整版本，例如 `AnimeRenamer_FutureDiary_v0.3.1.57.exe`。
 - 增加发布字体保护：发布包拒绝捆绑字体文件，并新增 DPI 初始化顺序与 UI 字号范围回归检查。
 - 项目目录重新整理：核心模块继续保留在仓库根目录，界面代码集中到 `ui/`，资源集中到 `assets/`，工具脚本集中到 `tools/`，历史 Preview 资料移入 `history/`。
 - CI 已适配新的目录结构，Windows 构建输出改为带完整构建版本号的 `dist/AnimeRenamer_FutureDiary_v*.exe`。
@@ -15,6 +15,11 @@
 - 修正右侧工作区顶部对齐、内容选择器尺寸和空预览说明文字被裁切的问题。
 - `build_exe.bat` 不自动安装或升级 PyInstaller，不清空整个 `dist/`，并继续使用 `assets/app_icon.ico` 作为 EXE 图标。
 - README 已同步当前目录、按钮名称、轻小说模式、复制进度 / 安全取消、Preview 19 UI 状态和版本化 EXE 命名规则。
+
+## 0.3.1
+
+- 将 `renamer_core.VERSION` 正式提升为 `0.3.1`，作为本地构建、GitHub Actions 和发布打包的默认产品版本来源。
+- `build_exe.bat` 直接回车使用当前项目版本；手动输入其他 `x.y.z` 仅作为本次构建的临时覆盖，不自动改写源码版本。
 
 ## Future Diary UI 打包合集（2026-09-19）
 

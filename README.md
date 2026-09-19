@@ -1,10 +1,10 @@
-# AnimeRenamer 0.3.0
+# AnimeRenamer 0.3.1
 
 Windows 离线番剧、字幕与轻小说文件整理工具。先扫描并检查预览，再执行原地重命名或复制整理。无需账号、API 密钥或网络服务。
 
 ## 启动
 
-- 已打包版本：双击 `AnimeRenamer_FutureDiary_v<产品版本>.<构建号>.exe`，例如 `AnimeRenamer_FutureDiary_v0.3.0.57.exe`，无需安装 Python。
+- 已打包版本：双击 `AnimeRenamer_FutureDiary_v<产品版本>.<构建号>.exe`，例如 `AnimeRenamer_FutureDiary_v0.3.1.57.exe`，无需安装 Python。
 - 源码版本：安装 Python 3.10+，双击 `run_app.bat`，或运行 `python AnimeRenamer.pyw`。程序运行只使用 Python 标准库。
 - 兼容入口：旧中文名脚本 `运行 AnimeRenamer.bat` 与 `生成EXE.bat` 仍然保留可用；新用户建议使用英文名脚本。若旧构建脚本与当前说明不一致，以 `build_exe.bat` 为准。
 - 源码与后续 Git 历史固定保存在 `AnimeRenamer` 目录；旁边的旧版本目录和 ZIP 可作为原始交付备份保留。
@@ -146,17 +146,17 @@ python -m pip install pyinstaller
 随后双击 `build_exe.bat`。EXE 文件名会直接包含完整构建版本，例如：
 
 ```text
-dist\AnimeRenamer_FutureDiary_v0.3.0.57.exe
+dist\AnimeRenamer_FutureDiary_v0.3.1.57.exe
 ```
 
 构建前会由 `tools/generate_version_info.py` 自动生成 Windows 版本信息：
 
-- `ProductVersion` 直接读取 `renamer_core.VERSION`，仍是项目发布版本，例如 `0.3.0`；
-- `FileVersion` 追加自动构建号，例如 `0.3.0.57`；
+- `ProductVersion` 直接读取 `renamer_core.VERSION`，仍是项目发布版本，例如 `0.3.1`；
+- `FileVersion` 追加自动构建号，例如 `0.3.1.57`；
 - EXE 文件名使用与 `FileVersion` 相同的完整版本号；
 - GitHub Actions 使用源码中的 `renamer_core.VERSION` 作为产品版本，并使用 `github.run_number` 作为构建号；
-- 本地 `build_exe.bat` 启动时会先询问本次产品版本，可直接输入三段版本号，例如 `0.3.1`；
-- 本地构建如果直接回车不输入，才默认使用 `renamer_core.VERSION`；
+- 本地 `build_exe.bat` 会显示当前项目版本；直接回车使用 `renamer_core.VERSION`（当前为 `0.3.1`）；
+- 也可输入其他三段版本号做一次性临时构建覆盖；该输入不会自动修改源码版本；
 - 构建号仍自动使用当前 Git 提交数量；若源码不在 Git 仓库中则使用 `0`；
 - 因此输入 `0.3.1` 后，若当前自动构建号为 `58`，会生成 `AnimeRenamer_FutureDiary_v0.3.1.58.exe`，其 `ProductVersion` 为 `0.3.1`、`FileVersion` 为 `0.3.1.58`；
 - 版本化 EXE 启动时会从自身文件名读取产品版本，所以标题栏和左下角版本显示也会与本次构建版本一致；源码直接运行时仍使用 `renamer_core.VERSION`。
