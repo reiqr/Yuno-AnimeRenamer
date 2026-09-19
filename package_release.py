@@ -17,6 +17,7 @@ def package():
         'file_operations.py',
         'README.md',
         'CHANGELOG.md',
+        'LICENSE',
         'build_exe.bat',
         'package_release.py',
         'windows_version_info.txt',
@@ -68,6 +69,8 @@ def package():
         assert prefix + 'assets/yuno_sidebar.png' in z.namelist()
         assert prefix + 'assets/yuno_sidebar_hd.png' in z.namelist()
         assert prefix + 'assets/yuno_banner.png' in z.namelist()
+        assert prefix + 'LICENSE' in z.namelist()
+        assert prefix + 'AnimeRenamer.exe' not in z.namelist()
 
     print(archive)
     return archive
