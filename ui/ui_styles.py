@@ -28,10 +28,10 @@ class StyleMixin:
         self.UI_ICONS = {}
         self.FONTS = {
             'body': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'PingFang SC', 'Segoe UI'),
-            'display': self._pick_font('Microsoft YaHei UI', 'Microsoft YaHei', 'Microsoft JhengHei UI', 'Segoe UI'),
-            'latin': self._pick_font('Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI Semibold', 'Segoe UI', 'Arial'),
+            'display': self._pick_font('Microsoft YaHei', 'Microsoft YaHei UI', 'Microsoft JhengHei UI', 'Segoe UI'),
+            'latin': self._pick_font('Segoe UI Variable Display', 'Segoe UI Semibold', 'Bahnschrift', 'Segoe UI', 'Arial'),
             'jp': self._pick_font('Yu Gothic UI', 'Yu Gothic', 'Meiryo UI', 'Noto Sans CJK JP', 'Noto Sans JP', 'Microsoft YaHei UI'),
-            'mono': self._pick_font('Cascadia Mono', 'Cascadia Code', 'Consolas', 'JetBrains Mono', 'DejaVu Sans Mono'),
+            'mono': self._pick_font('Cascadia Code', 'Cascadia Mono', 'Consolas', 'JetBrains Mono', 'DejaVu Sans Mono'),
         }
         self.option_add('*Font', (self.FONTS['body'], 9))
         self.UI_ICONS = {
@@ -67,7 +67,7 @@ class StyleMixin:
                         background=c['bg'], foreground=c['text'],
                         fieldbackground=c['panel2'], bordercolor=c['border'],
                         lightcolor=c['border'], darkcolor=c['border'],
-                        font=(self.FONTS['body'], 10))
+                        font=(self.FONTS['body'], 9))
         style.configure('App.TFrame', background=c['bg'])
         style.configure('Panel.TFrame', background=c['panel'])
         style.configure('Card.TFrame', background=c['panel2'])
@@ -90,7 +90,7 @@ class StyleMixin:
         style.configure('Title.TLabel', background=c['bg'], foreground=c['text'],
                         font=(self.FONTS['display'], 18, 'bold'))
         style.configure('Section.TLabel', background=c['panel'], foreground=c['text'],
-                        font=(self.FONTS['body'], 11, 'bold'))
+                        font=(self.FONTS['body'], 10, 'bold'))
         style.configure('Accent.TLabel', background=c['panel'], foreground=c['pink'])
         style.configure('Cyan.TLabel', background=c['panel2'], foreground=c['cyan'],
                         font=(self.FONTS['mono'], 8, 'bold'))
@@ -162,7 +162,7 @@ class StyleMixin:
                         background='#121017', fieldbackground='#121017', foreground='#EDE5EC',
                         font=(self.FONTS['body'], 9))
         style.configure('Treeview.Heading', background='#211923', foreground='#F7EAF3',
-                        relief='flat', borderwidth=0, padding=(5, 7), font=(self.FONTS['body'], 8, 'bold'))
+                        relief='flat', borderwidth=0, padding=(5, 7), font=(self.FONTS['body'], 9, 'bold'))
         style.map('Treeview', background=[('selected', '#6A2850')], foreground=[('selected', '#FFFFFF')])
         style.map('Treeview.Heading', background=[('active', '#38243A')], foreground=[('active', '#FFFFFF')])
         style.configure('Vertical.TScrollbar', background='#251B28', troughcolor='#0F0D12', arrowcolor='#B89EAE',

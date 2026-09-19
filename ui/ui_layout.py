@@ -55,7 +55,7 @@ class LayoutMixin:
         ttk.Label(side_intro, text='未来は、まだ書き換えられる。', style='Sidebar.TLabel',
                   font=(self.FONTS['jp'], 10, 'bold')).pack(anchor='w')
         ttk.Label(side_intro, text='确认预览，再改写文件名。', style='SidebarMuted.TLabel',
-                  font=(self.FONTS['body'], 8), justify='left').pack(anchor='w', pady=(4, 0))
+                  font=(self.FONTS['body'], 9), justify='left').pack(anchor='w', pady=(4, 0))
 
         ttk.Frame(side_text, style='Sidebar.TFrame').pack(fill='both', expand=True)
 
@@ -63,23 +63,23 @@ class LayoutMixin:
         side_flow.pack(fill='x', pady=(8, 0))
         ttk.Separator(side_flow, orient='horizontal').pack(fill='x', pady=(0, 8))
         ttk.Label(side_flow, text='DIARY FLOW', style='HeroSub.TLabel',
-                  font=(self.FONTS['mono'], 7, 'bold')).pack(anchor='w')
+                  font=(self.FONTS['mono'], 8, 'bold')).pack(anchor='w')
         for step, action, note in [('01', 'SCAN', '读取文件'), ('02', 'CHECK', '校对未来'),
                                    ('03', 'REWRITE', '执行改名')]:
             row = ttk.Frame(side_flow, style='Sidebar.TFrame')
             row.pack(fill='x', pady=(4 if step == '01' else 2, 0))
             ttk.Label(row, text=step, style='SidebarMuted.TLabel',
-                      font=(self.FONTS['mono'], 7, 'bold'), width=3).pack(side='left')
+                      font=(self.FONTS['mono'], 8, 'bold'), width=3).pack(side='left')
             ttk.Label(row, text=action, style='SidebarMuted.TLabel',
-                      font=(self.FONTS['mono'], 7, 'bold'), width=9).pack(side='left')
+                      font=(self.FONTS['mono'], 8, 'bold'), width=9).pack(side='left')
             ttk.Label(row, text=note, style='SidebarMuted.TLabel',
-                      font=(self.FONTS['body'], 7)).pack(side='left')
+                      font=(self.FONTS['body'], 8)).pack(side='left')
 
         side_bottom = ttk.Frame(side_text, style='Sidebar.TFrame')
         side_bottom.pack(fill='x', pady=(16, 0))
         ttk.Separator(side_bottom, orient='horizontal').pack(fill='x', pady=(0, 8))
         tk.Label(side_bottom, text='LOCAL / OFFLINE  ·  SAFE PREVIEW', bg='#110C14', fg='#59CFC8',
-                 font=(self.FONTS['mono'], 7, 'bold'), bd=0).pack(anchor='w')
+                 font=(self.FONTS['mono'], 8, 'bold'), bd=0).pack(anchor='w')
         ttk.Label(side_bottom, text=f'AnimeRenamer {VERSION}', style='SidebarMuted.TLabel',
                   font=(self.FONTS['mono'], 8)).pack(anchor='w', pady=(5, 0))
 
@@ -228,7 +228,7 @@ class LayoutMixin:
             variable=self.transfer_progress_var, length=220)
         self.transfer_bar.pack(side='left', fill='x', expand=True, padx=(2, 8), pady=5)
         tk.Label(self.transfer_frame, textvariable=self.transfer_detail_var, bg='#121017', fg='#AFA2AB',
-                 anchor='e', font=(self.FONTS['mono'], 7)).pack(side='left', padx=(0, 8))
+                 anchor='e', font=(self.FONTS['body'], 8)).pack(side='left', padx=(0, 8))
         self.cancel_copy_btn = ttk.Button(
             self.transfer_frame, text='取消复制', command=self.cancel_current_copy, style='Danger.TButton')
         self.cancel_copy_btn.pack(side='right', padx=(0, 6), pady=2)
@@ -240,20 +240,20 @@ class LayoutMixin:
         self.info_rail = info_rail
         info_rail.pack(fill='x', pady=(0, 5))
         tk.Label(info_rail, text='DIARY LOG', bg='#121017', fg=c['cyan'], padx=8, pady=4,
-                 font=(self.FONTS['mono'], 7, 'bold')).pack(side='left')
+                 font=(self.FONTS['mono'], 8, 'bold')).pack(side='left')
         self.detail_entry = tk.Entry(
             info_rail, textvariable=self.detail_var, state='readonly', readonlybackground='#121017',
             fg='#B9ABB5', relief='flat', bd=0, highlightthickness=0,
             selectbackground='#4A1F39', selectforeground='#FFFFFF',
-            font=(self.FONTS['body'], 8))
+            font=(self.FONTS['body'], 9))
         self.detail_entry.pack(side='left', fill='x', expand=True, padx=(0, 6), ipady=1)
         self.copy_detail_btn = tk.Button(
             info_rail, text='COPY', command=self.copy_selected_detail, bg='#17131A', fg=c['cyan'],
             activebackground='#243134', activeforeground='#8FFFF6', relief='flat', bd=0,
-            padx=7, pady=2, cursor='hand2', font=(self.FONTS['mono'], 7, 'bold'))
+            padx=7, pady=2, cursor='hand2', font=(self.FONTS['mono'], 8, 'bold'))
         self.copy_detail_btn.pack(side='right', padx=(0, 6))
-        tk.Label(info_rail, textvariable=self.status_var, bg='#121017', fg='#847983', anchor='e',
-                 font=(self.FONTS['mono'], 7)).pack(side='right', padx=(8, 8))
+        tk.Label(info_rail, textvariable=self.status_var, bg='#121017', fg='#A79AA4', anchor='e',
+                 font=(self.FONTS['body'], 8)).pack(side='right', padx=(8, 8))
 
         # Preview card gets the strongest boundary and owns most of the vertical space.
         preview_outer = tk.Frame(main, bg='#4A3040', bd=0, highlightthickness=0)
@@ -346,9 +346,9 @@ class LayoutMixin:
         tk.Label(empty_text, textvariable=self.empty_title_var, bg='#121017', fg='#EADFE7',
                  font=(self.FONTS['display'], 11, 'bold'), anchor='w').pack(fill='x')
         tk.Label(empty_text, text='WAITING FOR DIARY DATA', bg='#121017', fg='#6FCBC5',
-                 font=(self.FONTS['mono'], 7, 'bold'), anchor='w').pack(fill='x', pady=(2, 6))
+                 font=(self.FONTS['mono'], 8, 'bold'), anchor='w').pack(fill='x', pady=(2, 6))
         tk.Label(empty_text, textvariable=self.empty_sub_var, bg='#121017', fg='#887D85',
-                 wraplength=300, justify='left', anchor='w', font=(self.FONTS['body'], 8)).pack(fill='x')
+                 wraplength=300, justify='left', anchor='w', font=(self.FONTS['body'], 9)).pack(fill='x')
 
         for variable in [self.folder_var, self.title_var, self.season_var, self.template_name_var, self.template_var,
                          self.mode_var, self.output_var, self.recursive_var, self.sub_var,

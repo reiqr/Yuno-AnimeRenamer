@@ -243,7 +243,7 @@ class ThemeMixin:
         canvas.create_text(tx, 37, text='未来日记 · RENAME TERMINAL', anchor='w', fill=subtitle_fill,
                            font=(self.FONTS['body'], 9, 'bold'), tags='overlay')
         canvas.create_text(tx, 56, text='01 SCAN   →   02 CHECK   →   03 REWRITE', anchor='w', fill=step_fill,
-                           font=(self.FONTS['mono'], 7, 'bold'), tags='overlay')
+                           font=(self.FONTS['mono'], 8, 'bold'), tags='overlay')
         line_y = min(height - 8, 70)
         canvas.create_line(tx, line_y, min(width - 24, tx + 170), line_y,
                            fill='#FF4F91' if variant == 'bright' else '#8B3154', width=2, tags='overlay')
