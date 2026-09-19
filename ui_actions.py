@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from renamer_core import (READY, GroupSettings, build_plan, parse_override, execute_plan,
                           undo_last, recover_pending, pending_operation)
+from ui_constants import TEMPLATES
 from ui_dialogs import GroupDialog
 from ui_theme import ThemeToggle
 
