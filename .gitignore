@@ -11,6 +11,7 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+*.spec
 
 # Local settings and secrets
 .env
