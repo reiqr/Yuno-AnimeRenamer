@@ -101,8 +101,14 @@ class LayoutMixin:
             menu.add_command(label='移除右键快捷方式', command=lambda: self.set_explorer_integration(False))
             explorer.configure(menu=menu)
             explorer.grid(row=0, column=3, padx=(8, 0), sticky='e')
+        settings = ttk.Menubutton(chrome, text='设置')
+        settings_menu = tk.Menu(settings, tearoff=False)
+        settings_menu.add_command(label='AI 接口设置', command=self.configure_ai)
+        settings_menu.add_command(label='AI 分析所选文件', command=self.analyze_selection)
+        settings.configure(menu=settings_menu)
+        settings.grid(row=0, column=4, padx=(8, 0), sticky='e')
         self.chrome_status_line = tk.Frame(chrome, bg='#3A3239', height=2, bd=0)
-        self.chrome_status_line.grid(row=1, column=0, columnspan=4, sticky='ew', pady=(5, 0))
+        self.chrome_status_line.grid(row=1, column=0, columnspan=5, sticky='ew', pady=(5, 0))
 
         # Banner art has dark/bright variants: idle states stay moody, ready states brighten.
         self.banner_dark_photo = self._load_photo('yuno_banner_dark.png') or self._load_photo('yuno_banner.png')

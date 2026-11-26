@@ -58,6 +58,7 @@ _renamer_core.VERSION = _runtime_product_version(_renamer_core.VERSION)
 from renamer_core import (VERSION, READY, GroupSettings, build_plan, parse_override,
                           execute_plan, undo_last, recover_pending, pending_operation)
 from ui_actions import ActionMixin
+from ui_ai import AIMixin
 from ui_constants import TEMPLATES
 from ui_dialogs import DialogMixin, GroupDialog
 from ui_layout import LayoutMixin
@@ -67,7 +68,7 @@ from ui_theme import ThemeMixin, ThemeToggle
 from ui_view import ViewMixin
 
 
-class App(LightNovelMixin, ThemeMixin, DialogMixin, StyleMixin, LayoutMixin, ViewMixin, ActionMixin, tk.Tk):
+class App(AIMixin, LightNovelMixin, ThemeMixin, DialogMixin, StyleMixin, LayoutMixin, ViewMixin, ActionMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f'AnimeRenamer {VERSION} · 未来日记主题')

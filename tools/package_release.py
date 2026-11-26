@@ -70,7 +70,7 @@ def package():
 
     files = []
     for name in [
-        'AnimeRenamer.pyw', 'renamer_core.py', 'file_operations.py', 'explorer_integration.py',
+        'AnimeRenamer.pyw', 'renamer_core.py', 'file_operations.py', 'explorer_integration.py', 'ai_analysis.py',
         'README.md', 'CHANGELOG.md', 'LICENSE', 'build_exe.bat', 'run_app.bat',
         '运行 AnimeRenamer.bat', '生成EXE.bat',
     ]:
