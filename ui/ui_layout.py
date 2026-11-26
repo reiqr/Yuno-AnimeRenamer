@@ -94,8 +94,15 @@ class LayoutMixin:
                  relief='solid', padx=10, pady=4, highlightthickness=1, highlightbackground='#275A60',
                  font=(self.FONTS['mono'], 8, 'bold'))
         self.chrome_state_label.grid(row=0, column=2, sticky='e')
+        if self.tk.call('tk', 'windowingsystem') == 'win32':
+            explorer = ttk.Menubutton(chrome, text='资源管理器')
+            menu = tk.Menu(explorer, tearoff=False)
+            menu.add_command(label='添加右键快捷方式', command=lambda: self.set_explorer_integration(True))
+            menu.add_command(label='移除右键快捷方式', command=lambda: self.set_explorer_integration(False))
+            explorer.configure(menu=menu)
+            explorer.grid(row=0, column=3, padx=(8, 0), sticky='e')
         self.chrome_status_line = tk.Frame(chrome, bg='#3A3239', height=2, bd=0)
-        self.chrome_status_line.grid(row=1, column=0, columnspan=3, sticky='ew', pady=(5, 0))
+        self.chrome_status_line.grid(row=1, column=0, columnspan=4, sticky='ew', pady=(5, 0))
 
         # Banner art has dark/bright variants: idle states stay moody, ready states brighten.
         self.banner_dark_photo = self._load_photo('yuno_banner_dark.png') or self._load_photo('yuno_banner.png')

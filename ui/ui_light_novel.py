@@ -478,6 +478,10 @@ class LightNovelMixin:
             return super().scan()
         if self.busy:
             return
+        if self.selected_paths is not None:
+            self._alert('轻小说扫描', '轻小说模式请使用“浏览”选择一个文件夹。',
+                        kind='warning')
+            return
         self.plan = []
         self.tree.delete(*self.tree.get_children())
         self.dirty = True

@@ -198,11 +198,36 @@ def _iter_files(root, recursive):
             break
 
 
+def explorer_selection(paths):
+    """Return a shared display root and validated filesystem items."""
+    selected = {}
+    for value in paths:
+        path = Path(value)
+        if path.is_symlink() or getattr(path, 'is_junction', lambda: False)():
+            raise ValueError(f'无法导入链接：{path}')
+        path = path.resolve()
+        if not path.is_file() and not path.is_dir():
+            raise ValueError(f'选中的路径已不存在：{path}')
+        selected[os.path.normcase(str(path))] = path
+    items = tuple(selected.values())
+    if not items:
+        raise ValueError('没有收到资源管理器中的选区')
+    try:
+        root = Path(os.path.commonpath([p.parent for p in items]))
+    except ValueError as exc:
+        raise ValueError('请分批导入不同盘符或共享位置的选区') from exc
+    return root, items
+
+
 def build_plan(folder, title, season, template, recursive=False, rename_subtitles=True,
                preserve_language=True, force_sequence=False, sequence_start=1,
                group_settings=None, overrides=None, skipped=None,
-               mode='rename', output_folder=''):
-    root = Path(folder).resolve()
+               mode='rename', output_folder='', selected_paths=None):
+    if selected_paths is None:
+        root = Path(folder).resolve()
+        items = (root,)
+    else:
+        root, items = explorer_selection(selected_paths)
     if not root.is_dir():
         raise ValueError('请选择有效的输入文件夹')
     if mode not in {'rename', 'copy'}:
@@ -210,10 +235,19 @@ def build_plan(folder, title, season, template, recursive=False, rename_subtitle
     if not 1 <= sequence_start <= 9999:
         raise ValueError('起始集数须在 1–9999 之间')
     output = Path(output_folder).resolve() if output_folder else None
-    if mode == 'copy' and (output is None or output == root or root in output.parents):
+    scan_dirs = [p for p in items if p.is_dir()]
+    if mode == 'copy' and (output is None or output == root
+                           or any(output == p or p in output.parents for p in scan_dirs)):
         raise ValueError('复制目标必须在输入文件夹之外，避免再次导入已整理文件')
     groups, overrides, skipped = group_settings or {}, overrides or {}, set(skipped or [])
-    paths = sorted(_iter_files(root, recursive), key=lambda p: natural_key(p.relative_to(root)))
+    if selected_paths is None:
+        files = _iter_files(root, recursive)
+    else:
+        files = (p for item in items
+                 for p in (_iter_files(item, recursive) if item.is_dir() else (item,))
+                 if p.suffix.lower() in VIDEO_EXTS | SUB_EXTS
+                 and not p.name.startswith(('.__anime_renamer_', '.__anime_recovery_')))
+    paths = sorted(dict.fromkeys(files), key=lambda p: natural_key(p.relative_to(root)))
     if not rename_subtitles:
         paths = [p for p in paths if p.suffix.lower() in VIDEO_EXTS]
     originals = {p: detect_episode(p.name) for p in paths}

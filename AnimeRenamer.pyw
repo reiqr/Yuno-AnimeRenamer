@@ -76,6 +76,7 @@ class App(LightNovelMixin, ThemeMixin, DialogMixin, StyleMixin, LayoutMixin, Vie
         self.overrides, self.groups, self.skipped = {}, {}, set()
         self.busy, self.dirty = False, True
         self.source_context = ''
+        self.selected_paths = None
         self.group_nodes = {}
         self._busy_anim_id = None
         self._busy_anim_step = 0
@@ -111,4 +112,7 @@ class App(LightNovelMixin, ThemeMixin, DialogMixin, StyleMixin, LayoutMixin, Vie
 
 
 if __name__ == '__main__':
-    App().mainloop()
+    app = App()
+    if sys.argv[1:2] == ['--explorer']:
+        app.after_idle(app.open_explorer_selection, tuple(sys.argv[2:]))
+    app.mainloop()

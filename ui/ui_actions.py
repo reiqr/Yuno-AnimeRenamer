@@ -1,4 +1,5 @@
 import queue
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -6,7 +7,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from renamer_core import (READY, GroupSettings, build_plan, parse_override, execute_plan,
-                          undo_last, recover_pending, pending_operation)
+                          undo_last, recover_pending, pending_operation, explorer_selection)
+import explorer_integration
 from ui_constants import TEMPLATES
 from ui_dialogs import GroupDialog
 from ui_theme import ThemeToggle
@@ -25,6 +27,34 @@ def _format_speed(value):
 
 
 class ActionMixin:
+    def set_explorer_integration(self, enabled):
+        if self.busy:
+            return
+        try:
+            (explorer_integration.install if enabled else explorer_integration.remove)()
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            self._alert('资源管理器快捷方式', str(exc), kind='error')
+            return
+        if enabled:
+            self._alert('已添加快捷方式',
+                        '右键单个文件夹可打开预览。多选请使用“发送到 → AnimeRenamer - 打开预览”。'
+                        'Windows 11 中可先点“显示更多选项”。')
+        else:
+            self._alert('资源管理器快捷方式', '已移除 AnimeRenamer 的资源管理器入口。')
+
+    def open_explorer_selection(self, paths):
+        try:
+            root, items = explorer_selection(paths)
+        except (ValueError, OSError) as exc:
+            self._alert('无法导入资源管理器选区', str(exc), kind='error')
+            return
+        if len(items) == 1 and items[0].is_dir():
+            self.folder_var.set(str(items[0]))
+        else:
+            self.folder_var.set(f'{root}  [已选 {len(items)} 项]')
+            self.selected_paths = items
+        self.scan()
+
     def _mark_scan_started(self):
         if getattr(self, 'busy', False) and hasattr(self, 'scan_btn'):
             self.scan_btn.configure(text='刷新预览')
@@ -119,6 +149,7 @@ class ActionMixin:
     def settings_changed(self, *_):
         self._update_conditional_rows()
         if self.folder_var.get() != self.source_context:
+            self.selected_paths = None
             self.groups.clear()
             self.overrides.clear()
             self.skipped.clear()
@@ -242,7 +273,8 @@ class ActionMixin:
                         sequence_start=int(self.start_var.get()), group_settings=dict(self.groups),
                         overrides=dict(self.overrides), skipped=set(self.skipped),
                         mode='rename' if self.mode_var.get() == '原地重命名' else 'copy',
-                        output_folder=self.output_var.get().strip())
+                        output_folder=self.output_var.get().strip(),
+                        selected_paths=self.selected_paths)
             if not args['folder']:
                 raise ValueError('请选择输入文件夹')
         except ValueError as exc:
